@@ -1884,7 +1884,7 @@ input, select, textarea {
 		button:hover,
 		.button:hover {
 			box-shadow: inset 0 0 0 2px #2ee4bb;
-			color: #2ee4bb !important;
+			color: #A5BCCD !important;
 		}
 
 		input[type="submit"]:active,
@@ -1894,7 +1894,7 @@ input, select, textarea {
 		.button:active {
 			background-color: rgba(73, 252, 212, 0.25);
 			box-shadow: inset 0 0 0 2px #2ee4bb;
-			color: #2ee4bb !important;
+			color: #A5BCCD !important;
 		}
 
 		input[type="submit"].small,
@@ -1961,7 +1961,7 @@ input, select, textarea {
 		input[type="button"].primary,
 		button.primary,
 		.button.primary {
-			background-color: #899DA5;
+			background-color: #A5BCCD;
 			box-shadow: none;
 			color: #000000 !important;
 		}
@@ -1979,7 +1979,7 @@ input, select, textarea {
 			input[type="button"].primary:active,
 			button.primary:active,
 			.button.primary:active {
-				background-color: #44f2cb;
+				background-color: #A5BCCD;
 			}
 
 		@media screen and (max-width: 736px) {
