@@ -150,28 +150,34 @@
 						<header>
 							<h2>Get in touch</h2>
 						</header>
-						<div class="content">
-							<p><strong>Let's connect!</strong> Whether you're looking to reach a wider audience, improve conversion rates, or build a brand that truly stands out, I’d love to hear from you.</p>
+<div class="content">
+  <p><strong>Let's connect!</strong> Whether you're looking to reach a wider audience, improve conversion rates, or build a brand that truly stands out, I’d love to hear from you.</p>
 
-							<form action="https://formspree.io/f/xovdlkgo" method="POST">
-								<div class="fields">
-									<div class="field half">
-										<input type="text" name="name" id="name" placeholder="Name" />
-									</div>
-									<div class="field half">
-										<input type="email" name="email" id="email" placeholder="Email" />
-									</div>
-									<div class="field">
-										<textarea name="message" id="message" placeholder="Message" rows="7"></textarea>
-									</div>
-									<input type="hidden" name="_subject" value="New message from durand.nz">
+  <div id="form-container">
+    <form id="contact-form" action="https://formspree.io/f/xovdlkgo" method="POST">
+      <div class="fields">
+        <div class="field half">
+          <input type="text" name="name" id="name" placeholder="Name" required />
+        </div>
+        <div class="field half">
+          <input type="email" name="email" id="email" placeholder="Email" required />
+        </div>
+        <div class="field">
+          <textarea name="message" id="message" placeholder="Message" rows="7" required></textarea>
+        </div>
+        <input type="hidden" name="_subject" value="New message from durand.nz" />
+      </div>
+      <ul class="actions">
+        <li><input type="submit" value="Send Message" class="button primary" /></li>
+      </ul>
+    </form>
+  </div>
 
-								</div>
-								<ul class="actions">
-									<li><input type="submit" value="Send Message" class="button primary" /></li>
-								</ul>
-							</form>
-						</div>
+  <div id="thank-you-message" style="display: none;">
+    <p><strong>Thanks!</strong> Your message has been sent. I’ll be in touch soon.</p>
+  </div>
+</div>
+
 						<footer>
 							<ul class="items">
 								<li>
@@ -209,6 +215,38 @@
 			<script src="assets/js/breakpoints.min.js"></script>
 			<script src="assets/js/util.js"></script>
 			<script src="assets/js/main.js"></script>
+
+<!-- FORM JS -->
+<script>
+  const form = document.getElementById('contact-form');
+  const thankYou = document.getElementById('thank-you-message');
+  const formContainer = document.getElementById('form-container');
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault(); // Prevent default form submission
+
+    const formData = new FormData(form);
+
+    try {
+      const response = await fetch(form.action, {
+        method: form.method,
+        body: formData,
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        formContainer.style.display = 'none';
+        thankYou.style.display = 'block';
+      } else {
+        alert('Oops! Something went wrong.');
+      }
+    } catch (error) {
+      alert('There was a problem submitting your form.');
+    }
+  });
+</script>
 
 	</body>
 </html>
