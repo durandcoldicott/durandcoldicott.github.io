@@ -1,259 +1,270 @@
-<!DOCTYPE HTML>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<script>
+		(function () {
+			var saved = localStorage.getItem("theme");
+			var theme = saved || (window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+			document.documentElement.setAttribute("data-theme", theme);
+		})();
+	</script>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<meta name="color-scheme" content="dark light" />
+	<title>Durand Coldicott | AI & eCommerce Consultant | Aotearoa</title>
+	<meta name="description" content="AI and eCommerce consultant with 10+ years running a bespoke platform end-to-end. I help small businesses without in-house expertise align AI strategy with business strategy — from ideation through to hands-on delivery." />
+	<meta name="keywords" content="AI consultant, ecommerce consultant, AI strategy, AI ideation, bespoke ecommerce platform, digital strategist, AI-assisted development, small business consulting" />
+	<meta property="og:image" content="https://durand.nz/images/gallery/fulls/DSC02197.jpg" />
+	<link rel="icon" href="/images/gallery/favicon.png" type="image/png">
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+	<link rel="stylesheet" href="assets/css/fontawesome-all.min.css" />
+	<link rel="stylesheet" href="assets/css/main.css" />
+</head>
+<body>
 
-<html>
-	<head>
-		<title>Durand Coldicott | Digital Strategy, Storytelling & E-commerce | Aotearoa</title>
-		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-		<meta name="description" content="Experienced eCommerce Manager and Digital Marketing Specialist with a proven track record of driving significant growth for online businesses. Skilled in developing strategies that enhance User Experience (UX), optimize Conversion Rates (CRO), and boost Search Engine Visibility (SEO). At Evo Cycles, I lead digital operations, delivering impactful campaigns and managing cross-functional projects to achieve measurable results." />
-		<meta name="keywords" content="ecommerce manager, ecommerce expert, digital, webstore manager, digital specialist" />
-		<meta property="og:image" content="https://durand.nz/images/gallery/fulls/DSC02197.jpg" /> 
-		<link rel="stylesheet" href="assets/css/main.css" />
-		<link rel="icon" href="/images/gallery/favicon.png" type="image/png">
-	</head>
-	<body class="is-preload">
+	<nav id="site-nav">
+		<a href="#hero" class="brand">Durand Coldicott</a>
+		<ul>
+			<li><a href="#about">About</a></li>
+			<li><a href="#capabilities">Capabilities</a></li>
+			<li><a href="#approach">Approach</a></li>
+			<li><a href="#results">Results</a></li>
+			<li><a href="#contact">Contact</a></li>
+			<li><a href="#work">Photography</a></li>
+		</ul>
+		<div class="nav-right">
+			<button id="theme-toggle" aria-label="Toggle light and dark mode">
+				<i class="fas fa-sun" aria-hidden="true"></i>
+				<i class="fas fa-moon" aria-hidden="true"></i>
+			</button>
+			<button id="nav-toggle" aria-label="Menu">Menu</button>
+		</div>
+	</nav>
 
-		<!-- Wrapper -->
-			<div id="wrapper">
+	<section id="hero">
+		<div class="container">
+			<p class="kia-ora">Kia ora, I'm Durand</p>
+			<h1>Bespoke eCommerce.<br>AI-accelerated delivery.</h1>
+			<p class="role-line"><strong>10+ years</strong> running a highly bespoke eCommerce platform end-to-end, with deep expertise across the full product lifecycle — from development and execution through to activation and analysis. Building at pace now, using a combination of AI and a solid foundation in eCommerce fundamentals, from a career spent across the entire digital landscape.</p>
 
-				<!-- Intro -->
-					<section class="intro">
-						<header>
-							<p>Kia ora!</p>
-							<h1>I'm Durand</h1>
-							<p>Digital Strategist | E-commerce Lead | Storyteller | <a href="https://www.linkedin.com/in/durand-coldicott/">LinkedIn</a></p>
-							<p class="intro-sub">Connecting people, place, and purpose through meaningful digital storytelling.</p>
-					
-							<ul class="actions">
-								<li><a href="#first" class="arrow scrolly"><span class="label">Next</span></a></li>
-							</ul>
-						</header>
-						<div class="content">
-							<!-- <span class="image fill" data-position="center"><img src="images/gallery/fulls/DSC02197.jpg" alt="" /></span> --> 
-							<span class="image fill" data-position="center"><img src="images/gallery/fulls/DSC02197.jpg" alt="" /></span>
-						</div>
-							
-					</section>
+			<div id="concierge" class="reveal">
+				<div class="concierge-label"><span class="dot"></span> Ask my AI concierge about my experience</div>
+				<div id="concierge-thread" aria-live="polite"></div>
+				<form id="concierge-form">
+					<input type="text" id="concierge-input" placeholder="e.g. Does he know Klaviyo flow automation?" maxlength="500" autocomplete="off" />
+					<button type="submit" id="concierge-send">Ask</button>
+				</form>
+				<div class="concierge-suggestions">
+					<button type="button" data-q="What's your core skillset?">What's your core skillset?</button>
+					<button type="button" data-q="Have you worked with Klaviyo flows?">Klaviyo flows?</button>
+					<button type="button" data-q="How do you use AI in your work?">How do you use AI?</button>
+				</div>
+				<div id="concierge-limit" hidden>
+					<p>Have more questions? <a href="#contact">Get in touch</a> and let's talk properly.</p>
+				</div>
+			</div>
+		</div>
+	</section>
 
-				<!-- Section -->
-					<section id="first">
-						<header>
-							<h2>About me</h2>
-						</header>
-						<div class="content">
-							<p>With over a decade of hands-on experience, I've helped brands grow, scale, and connect meaningfully with their audiences. Whether it’s crafting authentic campaigns, improving digital experiences, or building brand communities, I blend data-driven strategy with storytelling grounded in the culture and values of Aotearoa</p> 
-							<p>When I’m not building campaigns or refining online experiences, you’ll find me exploring the mountains, capturing stories, and staying inspired by the natural world that shapes so much of my creative approach.</p>
-							<span class="image main"><img src="images/gallery/fulls/20230402-IMG_9871.jpg" alt="" /></span>
-						</div>
-					</section>
+	<section id="about">
+		<div class="container">
+			<p class="eyebrow">About</p>
+			<h2>Commercial grounding, technical delivery.</h2>
+			<p class="lead">With over a decade of hands-on experience, I've helped brands grow, scale, and connect meaningfully with their audiences — blending data-driven strategy with storytelling grounded in the culture and values of Aotearoa.</p>
+			<p>My core skillset is managing highly bespoke and complex eCommerce operations, end-to-end. Alongside that, I run SaaS tools including Shopify and Klaviyo, where I design and automate email lifecycle flows in real depth. More recently, I've paired that commercial and platform grounding with AI-assisted development — I design, build, and ship digital solutions at a pace legacy processes can't match, without cutting corners on security or maintainability, backed by a practised eye for design and the judgement that comes from over a decade of commercial product and project ownership.</p>
+			<p>When I'm not building campaigns or refining online experiences, you'll find me exploring the mountains, capturing stories, and staying inspired by the natural world that shapes so much of my creative approach.</p>
+		</div>
+	</section>
 
-				<!-- Section -->
-				<section>
-				    <header>
-				        <h2>What I Bring</h2>
-				    </header>
-				    <div class="content">
-				        <p><strong>I turn insight into impact.</strong> With deep experience across eCommerce strategy, UX, SEO, and campaign execution, I help brands grow their reach, boost conversions, and build lasting customer relationships.</p>
+	<section id="capabilities">
+		<div class="container">
+			<p class="eyebrow">Capabilities</p>
+			<h2>Broad capabilities, one operator.</h2>
+			<div class="pillars">
+				<div class="pillar reveal">
+					<h3>eCommerce Fundamentals</h3>
+					<p>Grounded in rock-solid eCommerce fundamentals — the operational core everything else is built on.</p>
+				</div>
+				<div class="pillar reveal">
+					<h3>Full-Stack Digital Toolset</h3>
+					<p>Deep understanding of the full suite of digital tools — not just in strategy, but hands-on in the tools themselves.</p>
+				</div>
+				<div class="pillar reveal">
+					<h3>Marketing Automation</h3>
+					<p>Transactional, marketing email, SMS, and ads — Shopping and Meta included — automated end-to-end.</p>
+				</div>
+				<div class="pillar reveal">
+					<h3>AI-Accelerated Build</h3>
+					<p>AI-accelerated building is native to my workflow, increasing speed, efficiency, and accuracy.</p>
+				</div>
+				<div class="pillar reveal">
+					<h3>Growth Mindset</h3>
+					<p>SEO, UX, and CRO — growth thinking applied across the whole customer journey.</p>
+				</div>
+				<div class="pillar reveal">
+					<h3>Strategic Range</h3>
+					<p>From high-level ideation, to roadmapping, to hands-on implementation.</p>
+				</div>
+				<div class="pillar reveal">
+					<h3>Data-Focused</h3>
+					<p>Data drives decision-making, review, and every step in between — not just the headline metrics.</p>
+				</div>
+			</div>
+		</div>
+	</section>
 
-				        <ul class="feature-icons">
-				            <li class="icon solid fa-chart-line">eCommerce Strategy & Growth</li>
-				            <li class="icon solid fa-user-check">User Experience (UX) Optimization</li>
-				            <li class="icon solid fa-chart-pie">Conversion Rate Optimization (CRO)</li>
-				            <li class="icon solid fa-search">Search Engine Optimization (SEO)</li>
-				            <li class="icon solid fa-envelope">Email Marketing Campaigns</li>
-				            <li class="icon solid fa-cogs">Digital Operations Management</li>
-				            <li class="icon solid fa-project-diagram">Cross-Functional Team Leadership</li>
-				            <li class="icon solid fa-tools">Data-Driven Problem Solving</li>
-				            <li class="icon solid fa-camera">Photography & Video Production</li>
-				            <li class="icon solid fa-film">Storytelling & Brand Content Creation</li>
-				            <li class="icon solid fa-share-alt">Social Media Strategy & Management</li>
-				            <li class="icon solid fa-fire">Social & Community Engagement.</li>
-				            <li class="icon solid fa-network-wired">Website Replatforming & Integration</li>
-				            
-				        </ul>
-				        <p>Whether it’s improving online user experiences, launching viral campaigns, producing high-quality visual content, I bring technical expertise and creative vision to every project.</p>
-				    </div>
-				</section>
+	<section id="approach">
+		<div class="container">
+			<p class="eyebrow">Approach</p>
+			<h2>How I work.</h2>
+			<p class="lead">I work as an AI and eCommerce consultant — often with small businesses that don't have this expertise in-house. Aligning AI strategy with business strategy, ideation if you're not sure where to start, prototyping, consulting, or hands-on delivery — I plug in at whichever stage you need.</p>
 
-<!-- Tools Section -->
-<section>
-    <header>
-        <h2>Experience</h2>
-    </header>
-    <div class="content">
-        <p><strong>Deep platform expertise, built from the ground up.</strong> I’ve worked directly with the tools that drive eCommerce success, from storefronts and CRMs to analytics and automation platforms. I'm quick to adopt new SaaS tools and always focused on leveraging them to streamline operations, drive growth, and create seamless digital experiences.</p>
-
-        <ul class="feature-icons">
-            
-			<li class="icon brands fa-google">Google Workspace</li>
-            <li class="icon solid fa-envelope">Mailchimp / Klaviyo</li>
-            <li class="icon brands fa-shopify">Shopify</li>
-            <li class="icon solid fa-chart-bar">Google Analytics / GA4 / PowerBi</li>
-            <li class="icon solid fa-bullhorn">Meta Business & Ads Manager</li>
-            <li class="icon solid fa-bolt">Performance Marketing Tools</li>
-            <li class="icon solid fa-tasks">Asana</li>
-            <li class="icon solid fa-layer-group">Adobe Creative Suite</li>
-        </ul>
-        <p>With over a decade in eCommerce, I bring a well-rounded command of digital strategy, content production, campaign execution, and customer experience optimization. I believe every challenge deserves the right tool, and I know how to use the best ones to get results.</p>
-<p>Across roles with Evo Cycles, Torpedo7, and R&R Sport, I’ve led digital transformation and creative marketing initiatives that built lasting connections between brands and communities across Aotearoa.</p>
-
-    </div>
-</section>
-
-<!-- WORK EXAMPLES -->
-				<!-- Section -->
-					<section>
-						<header>
-							<h2>Examples</h2>
-						</header>
-						<div class="content">
-							<p><strong>Visual storytelling is where I stand out</strong>, especially among eCommerce professionals. I bring the technical skills to drive sustainable growth and the creative instinct to craft content that connects, converts, and elevates brand presence. </p>
-
-				<!-- Section -->
-					<section>
-						<header>
-							<h3>A Picture Is Worth a Thousand Words</h3>
-							<p>Whether I'm behind the camera, collaborating with influencers, or guiding creative agencies, I know how to create visually compelling assets that cut through the noise and capture attention, while staying aligned with performance goals.</p>
-						</header>
-						<div class="content">
-							<div class="gallery">
-								<!-- KIRWANS -->
-								<a href="images/gallery/fulls/kirwans_1.jpg" class="landscape"><img src="images/gallery/fulls/kirwans_1.jpg" alt="" /></a>
-								<a href="images/gallery/fulls/Kirwans_3.jpg"><img src="images/gallery/fulls/Kirwans_3.jpg" alt="" /></a>
-								<a href="images/gallery/fulls/kirwans_4.jpg"><img src="images/gallery/fulls/kirwans_4.jpg" alt="" /></a>
-								<a href="images/gallery/fulls/kirwans_2.jpg" class="landscape"><img src="images/gallery/fulls/kirwans_2.jpg" alt="" /></a>
-
-								<!-- BIKES -->
-								<a href="images/gallery/fulls/20221208-IMG_8834.jpg" class="landscape"><img src="images/gallery/fulls/20221208-IMG_8834.jpg" alt="" /></a>
-								<a href="images/gallery/fulls/20230531-IMG_0290.jpg"><img src="images/gallery/fulls/20230531-IMG_0290.jpg" alt="" /></a>
-								<a href="images/gallery/fulls/20230531-IMG_0275.jpg"><img src="images/gallery/fulls/20230531-IMG_0275.jpg" alt="" /></a>
-							</div>
-						</div>
-					</section>
-
-
-						</div>
-					</section>
-
-				<!-- Section -->
-					<section>
-						<header>
-							<h2>Experience</h2>
-						</header>
-						<div class="content">
-							<p><strong>Proof over promises:</strong> I’ve had the privilege of helping a range of eCommerce brands grow, evolve, and stand out through both strategic insight and creative execution. For a full view of the companies I’ve worked with and the results I’ve delivered, head over to my LinkedIn.</p>
-							<ul class="actions">
-								<li><a href="https://www.linkedin.com/in/durand-coldicott/" class="button primary large">Learn More</a></li>
-								<!-- <li><a href="#" class="button large">Learn More</a></li> -->
-							</ul>
-						</div>
-					</section>
-
-
-				<!-- Section -->
-					<section>
-						<header>
-							<h2>Get in touch</h2>
-						</header>
-						<div class="content">
-						  <p><strong>Let's connect!</strong> Whether you're looking to reach a wider audience, improve conversion rates, or build a brand that connects and endures, I’d love to hear from you. Ngā mihi nui.</p>
-
-						  <div id="form-container">
-						    <form id="contact-form" action="https://formspree.io/f/xovdlkgo" method="POST">
-						      <div class="fields">
-						        <div class="field half">
-						          <input type="text" name="name" id="name" placeholder="Name" required />
-						        </div>
-						        <div class="field half">
-						          <input type="email" name="email" id="email" placeholder="Email" required />
-						        </div>
-						        <div class="field">
-						          <textarea name="message" id="message" placeholder="Message" rows="7" required></textarea>
-						        </div>
-						        <input type="hidden" name="_subject" value="New message from durand.nz" />
-						      </div>
-						      <ul class="actions">
-						        <li><input type="submit" value="Send Message" class="button primary" /></li>
-						      </ul>
-						    </form>
-						  </div>
-
-						  <div id="thank-you-message" style="display: none;">
-						    <p><strong>Thanks!</strong> Your message has been sent. I’ll be in touch soon.</p>
-						  </div>
-						</div>
-
-						<footer>
-							<ul class="items">
-								<li>
-									<h3>Email</h3>
-									<a href="mailto:durandcoldicott@gmail.com">durandcoldicott@gmail.com</a>
-								</li>
-								<li>
-									<h3>Phone</h3>
-									<a href="tel:+64226176277">(022) 617-6277</a>
-								</li>
-								<li>
-									<h3>Address</h3>
-									<span>Nelson, 7010, New Zealand</span>
-								</li>
-								<li>
-									<h3>Elsewhere</h3>
-									<ul class="icons">
-										
-										<li><a href="https://www.instagram.com/durand.nz/" class="icon brands fa-instagram"><span class="label">Instagram</span></a></li>
-										<li><a href="https://www.linkedin.com/in/durand-coldicott/" class="icon brands fa-linkedin-in"><span class="label">LinkedIn</span></a></li>
-									</ul>
-								</li>
-							</ul>
-						</footer>
-					</section>
-
-
-
+			<div class="tile-grid reveal">
+				<div class="tile">
+					<span class="tile-number">01</span>
+					<span class="tile-icon"><i class="fas fa-flag" aria-hidden="true"></i></span>
+					<span class="tile-label">Need</span>
+				</div>
+				<div class="tile">
+					<span class="tile-number">02</span>
+					<span class="tile-icon"><i class="fas fa-search" aria-hidden="true"></i></span>
+					<span class="tile-label">Problem statement</span>
+				</div>
+				<div class="tile">
+					<span class="tile-number">03</span>
+					<span class="tile-icon"><i class="fas fa-drafting-compass" aria-hidden="true"></i></span>
+					<span class="tile-label">Solution design</span>
+				</div>
+				<div class="tile">
+					<span class="tile-number">04</span>
+					<span class="tile-icon"><i class="fas fa-hammer" aria-hidden="true"></i></span>
+					<span class="tile-label">Implementation</span>
+				</div>
+				<div class="tile">
+					<span class="tile-number">05</span>
+					<span class="tile-icon"><i class="fas fa-comment-dots" aria-hidden="true"></i></span>
+					<span class="tile-label">Feedback &amp; smart insights</span>
+				</div>
+				<div class="tile tile-loop-point">
+					<span class="tile-number">06</span>
+					<span class="tile-icon"><i class="fas fa-redo" aria-hidden="true"></i></span>
+					<span class="tile-label">Iteration</span>
+					<span class="tile-loop-tag"><i class="fas fa-chevron-right" aria-hidden="true"></i> back to Need</span>
+				</div>
 			</div>
 
-		<!-- Scripts -->
-			<script src="assets/js/jquery.min.js"></script>
-			<script src="assets/js/jquery.scrolly.min.js"></script>
-			<script src="assets/js/browser.min.js"></script>
-			<script src="assets/js/breakpoints.min.js"></script>
-			<script src="assets/js/util.js"></script>
-			<script src="assets/js/main.js"></script>
+			<div class="examples">
+				<h3 class="examples-heading">Not sure where to start? Here's the kind of thing I mean:</h3>
+				<div class="examples-grid">
+					<div class="example-card reveal">
+						<span class="example-icon"><i class="fas fa-envelope-open-text" aria-hidden="true"></i></span>
+						<span class="example-tag">Example 01</span>
+						<p class="example-title">Email flows that never got past "welcome"</p>
+					</div>
+					<div class="example-card reveal">
+						<span class="example-icon"><i class="fas fa-tasks" aria-hidden="true"></i></span>
+						<span class="example-tag">Example 02</span>
+						<p class="example-title">Manual processes eating up hours every week</p>
+					</div>
+					<div class="example-card reveal">
+						<span class="example-icon"><i class="fas fa-chart-line" aria-hidden="true"></i></span>
+						<span class="example-tag">Example 03</span>
+						<p class="example-title">No visibility into where customers drop off</p>
+					</div>
+				</div>
+			</div>
+		</div>
+	</section>
 
-<!-- FORM JS -->
-<script>
-  const form = document.getElementById('contact-form');
-  const thankYou = document.getElementById('thank-you-message');
-  const formContainer = document.getElementById('form-container');
+	<section id="results">
+		<div class="container">
+			<p class="eyebrow">Results</p>
+			<h2>Proof over promises.</h2>
+			<p class="lead">Over a decade leading digital and eCommerce functions at Evo Cycles, Torpedo7, and R&amp;R Sport, I've owned full-scale website replatforming projects, built paid and lifecycle marketing programmes from the ground up, and turned messy operational processes into systems that run themselves.</p>
+			<p>More recently, I've used AI-assisted development to deliver custom tools and integrations in days rather than months — work that would previously have needed a developer sprint or an agency retainer. Want the detail? Full campaign results, growth metrics, and project history are on LinkedIn.</p>
+			<a href="https://www.linkedin.com/in/durand-coldicott/" class="btn">View LinkedIn</a>
+		</div>
+	</section>
 
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault(); // Prevent default form submission
+	<section id="contact">
+		<div class="container">
+			<div class="contact-intro">
+				<img class="contact-photo" src="images/gallery/fulls/DSC02197.jpg" width="1881" height="1881" loading="lazy" alt="Durand Coldicott hiking through native New Zealand bush, wearing a backpack and sunglasses" />
+				<div>
+					<p class="eyebrow">Get in touch</p>
+					<h2>Let's connect.</h2>
+					<p class="lead">Whether you're looking to reach a wider audience, improve conversion rates, or build a brand that connects and endures, I'd love to hear from you. Ngā mihi nui.</p>
+				</div>
+			</div>
 
-    const formData = new FormData(form);
+			<div id="form-container">
+				<form id="contact-form" action="https://formspree.io/f/xovdlkgo" method="POST">
+					<div class="field-row">
+						<div class="field">
+							<input type="text" name="name" id="name" placeholder="Name" required />
+						</div>
+						<div class="field">
+							<input type="email" name="email" id="email" placeholder="Email" required />
+						</div>
+					</div>
+					<div class="field" style="margin-bottom: 14px;">
+						<textarea name="message" id="message" placeholder="Message" rows="6" required></textarea>
+					</div>
+					<input type="hidden" name="_subject" value="New message from durand.nz" />
+					<button type="submit" class="btn">Send Message</button>
+				</form>
+			</div>
 
-    try {
-      const response = await fetch(form.action, {
-        method: form.method,
-        body: formData,
-        headers: {
-          'Accept': 'application/json'
-        }
-      });
+			<div id="thank-you-message" style="display: none;">
+				<p><strong>Thanks!</strong> Your message has been sent. I'll be in touch soon.</p>
+			</div>
 
-      if (response.ok) {
-        formContainer.style.display = 'none';
-        thankYou.style.display = 'block';
-      } else {
-        alert('Oops! Something went wrong.');
-      }
-    } catch (error) {
-      alert('There was a problem submitting your form.');
-    }
-  });
-</script>
+			<footer>
+				<ul class="items">
+					<li>
+						<h3>Email</h3>
+						<a href="mailto:durandcoldicott@gmail.com">durandcoldicott@gmail.com</a>
+					</li>
+					<li>
+						<h3>Phone</h3>
+						<a href="tel:+64226176277">(022) 617-6277</a>
+					</li>
+					<li>
+						<h3>Address</h3>
+						<span style="color: var(--text-muted);">Nelson, 7010, New Zealand</span>
+					</li>
+					<li>
+						<h3>Elsewhere</h3>
+						<ul class="icons">
+							<li><a href="https://www.instagram.com/durand.nz/" class="fab fa-instagram" aria-label="Instagram"></a></li>
+							<li><a href="https://www.linkedin.com/in/durand-coldicott/" class="fab fa-linkedin-in" aria-label="LinkedIn"></a></li>
+						</ul>
+					</li>
+				</ul>
+				<p class="copyright">&copy; Durand Coldicott.</p>
+			</footer>
+		</div>
+	</section>
 
-	</body>
+	<section id="work">
+		<div class="container">
+			<p class="eyebrow">One more thing</p>
+			<h2>Not just technical.</h2>
+			<p class="lead">Behind the strategy and the systems, I'm also hands-on and creative — whether that's fine-tuning a UX detail or being behind the camera, capturing the content that brings a brand's story to life.</p>
+			<p>The set below is campaign and brand content produced for Evo Cycles.</p>
+			<div class="gallery">
+				<div class="gallery-item"><img src="images/gallery/fulls/kirwans_1.jpg" width="1920" height="1280" loading="lazy" alt="Mountain biker carrying his bike over a fallen tree on a native forest singletrack" /></div>
+				<div class="gallery-item"><img src="images/gallery/fulls/Kirwans_3.jpg" width="1920" height="1280" loading="lazy" alt="Mountain biker riding through moss-draped native forest on a foggy trail" /></div>
+				<div class="gallery-item"><img src="images/gallery/fulls/kirwans_4.jpg" width="1920" height="1280" loading="lazy" alt="Bikepacker riding through misty, moss-covered native forest with a loaded handlebar bag" /></div>
+				<div class="gallery-item"><img src="images/gallery/fulls/20221208-IMG_8834.jpg" width="1920" height="1280" loading="lazy" alt="Group of mountain bikers relaxing at a trailside picnic table after a ride" /></div>
+				<div class="gallery-item"><img src="images/gallery/fulls/20230531-IMG_0290.jpg" width="1920" height="1280" loading="lazy" alt="Mud-splattered detail shot of a mountain bike after a wet trail ride" /></div>
+				<div class="gallery-item"><img src="images/gallery/fulls/20230531-IMG_0275.jpg" width="1920" height="1280" loading="lazy" alt="Mountain bike posed on a grassy ridge with native forest and mountains behind" /></div>
+			</div>
+		</div>
+	</section>
+
+	<script src="assets/js/main.js"></script>
+</body>
 </html>
-
-

@@ -1,208 +1,205 @@
-/*
-	Paradigm Shift by HTML5 UP
-	html5up.net | @ajlkn
-	Free for personal and commercial use under the CCA 3.0 license (html5up.net/license)
-*/
+(function () {
+	"use strict";
 
-(function($) {
-
-	var	$window = $(window),
-		$body = $('body');
-
-	// Breakpoints.
-		breakpoints({
-			default:   ['1681px',   null       ],
-			xlarge:    ['1281px',   '1680px'   ],
-			large:     ['981px',    '1280px'   ],
-			medium:    ['737px',    '980px'    ],
-			small:     ['481px',    '736px'    ],
-			xsmall:    ['361px',    '480px'    ],
-			xxsmall:   [null,       '360px'    ]
+	// Theme toggle
+	var themeToggle = document.getElementById("theme-toggle");
+	if (themeToggle) {
+		themeToggle.addEventListener("click", function () {
+			var current = document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
+			var next = current === "light" ? "dark" : "light";
+			document.documentElement.setAttribute("data-theme", next);
+			try {
+				localStorage.setItem("theme", next);
+			} catch (err) {
+				/* storage unavailable, theme just won't persist */
+			}
 		});
+	}
 
-	// Play initial animations on page load.
-		$window.on('load', function() {
-			window.setTimeout(function() {
-				$body.removeClass('is-preload');
-			}, 100);
+	// Mobile nav toggle
+	var navToggle = document.getElementById("nav-toggle");
+	var navList = document.querySelector("#site-nav ul");
+	if (navToggle && navList) {
+		navToggle.addEventListener("click", function () {
+			var open = navList.style.display === "flex";
+			navList.style.display = open ? "none" : "flex";
+			navList.style.flexDirection = "column";
+			navList.style.position = "absolute";
+			navList.style.top = "62px";
+			navList.style.right = "20px";
+			navList.style.background = "var(--bg-elevated)";
+			navList.style.border = "1px solid var(--border-strong)";
+			navList.style.borderRadius = "10px";
+			navList.style.padding = "14px 20px";
+			navList.style.gap = "14px";
 		});
+	}
 
-	// Hack: Enable IE workarounds.
-		if (browser.name == 'ie')
-			$body.addClass('is-ie');
+	// Scroll reveal
+	var revealEls = document.querySelectorAll(".reveal");
+	if ("IntersectionObserver" in window && revealEls.length) {
+		var observer = new IntersectionObserver(
+			function (entries) {
+				entries.forEach(function (entry) {
+					if (entry.isIntersecting) {
+						entry.target.classList.add("is-visible");
+						observer.unobserve(entry.target);
+					}
+				});
+			},
+			{ threshold: 0.15 }
+		);
+		revealEls.forEach(function (el) { observer.observe(el); });
+	} else {
+		revealEls.forEach(function (el) { el.classList.add("is-visible"); });
+	}
 
-	// Mobile?
-		if (browser.mobile)
-			$body.addClass('is-mobile');
+	// Contact form
+	var form = document.getElementById("contact-form");
+	var thankYou = document.getElementById("thank-you-message");
+	var formContainer = document.getElementById("form-container");
 
-	// Scrolly.
-		$('.scrolly')
-			.scrolly({
-				offset: 100
-			});
+	if (form) {
+		form.addEventListener("submit", function (e) {
+			e.preventDefault();
+			var formData = new FormData(form);
 
-	// Polyfill: Object fit.
-		if (!browser.canUse('object-fit')) {
+			fetch(form.action, {
+				method: form.method,
+				body: formData,
+				headers: { Accept: "application/json" },
+			})
+				.then(function (response) {
+					if (response.ok) {
+						formContainer.style.display = "none";
+						thankYou.style.display = "block";
+					} else {
+						alert("Oops! Something went wrong.");
+					}
+				})
+				.catch(function () {
+					alert("There was a problem submitting your form.");
+				});
+		});
+	}
 
-			$('.image[data-position]').each(function() {
+	// AI concierge
+	var concierge = {
+		form: document.getElementById("concierge-form"),
+		input: document.getElementById("concierge-input"),
+		send: document.getElementById("concierge-send"),
+		thread: document.getElementById("concierge-thread"),
+		suggestions: document.querySelectorAll(".concierge-suggestions button"),
+		suggestionsWrap: document.querySelector(".concierge-suggestions"),
+		limit: document.getElementById("concierge-limit"),
+	};
 
-				var $this = $(this),
-					$img = $this.children('img');
+	var MAX_QUESTIONS = 5;
+	var QUESTION_COUNT_KEY = "concierge_question_count";
 
-				// Apply img as background.
-					$this
-						.css('background-image', 'url("' + $img.attr('src') + '")')
-						.css('background-position', $this.data('position'))
-						.css('background-size', 'cover')
-						.css('background-repeat', 'no-repeat');
+	function getQuestionCount() {
+		try {
+			return parseInt(localStorage.getItem(QUESTION_COUNT_KEY), 10) || 0;
+		} catch (err) {
+			return 0;
+		}
+	}
 
-				// Hide img.
-					$img
-						.css('opacity', '0');
+	function incrementQuestionCount() {
+		try {
+			localStorage.setItem(QUESTION_COUNT_KEY, String(getQuestionCount() + 1));
+		} catch (err) {
+			/* storage unavailable, cap just won't persist across reloads */
+		}
+	}
 
-			});
+	function showLimitReached() {
+		concierge.form.hidden = true;
+		if (concierge.suggestionsWrap) concierge.suggestionsWrap.hidden = true;
+		concierge.limit.hidden = false;
+	}
 
-			$('.gallery > a').each(function() {
+	if (getQuestionCount() >= MAX_QUESTIONS) {
+		showLimitReached();
+	}
 
-				var $this = $(this),
-					$img = $this.children('img');
+	function addMessage(text, cls) {
+		var el = document.createElement("div");
+		el.className = "msg " + cls;
+		el.textContent = text;
+		concierge.thread.appendChild(el);
+		concierge.thread.scrollTop = concierge.thread.scrollHeight;
+		return el;
+	}
 
-				// Apply img as background.
-					$this
-						.css('background-image', 'url("' + $img.attr('src') + '")')
-						.css('background-position', 'center')
-						.css('background-size', 'cover')
-						.css('background-repeat', 'no-repeat');
+	function addTyping() {
+		var el = document.createElement("div");
+		el.className = "msg msg-assistant msg-typing";
+		el.innerHTML = "<span></span><span></span><span></span>";
+		concierge.thread.appendChild(el);
+		concierge.thread.scrollTop = concierge.thread.scrollHeight;
+		return el;
+	}
 
-				// Hide img.
-					$img
-						.css('opacity', '0');
-
-			});
-
+	function askConcierge(question) {
+		if (!question || !question.trim()) return;
+		if (getQuestionCount() >= MAX_QUESTIONS) {
+			showLimitReached();
+			return;
 		}
 
-	// Gallery.
-		$('.gallery')
-			.on('click', 'a', function(event) {
+		incrementQuestionCount();
+		addMessage(question, "msg-user");
+		concierge.input.value = "";
+		concierge.send.disabled = true;
+		var typingEl = addTyping();
 
-				var $a = $(this),
-					$gallery = $a.parents('.gallery'),
-					$modal = $gallery.children('.modal'),
-					$modalImg = $modal.find('img'),
-					href = $a.attr('href');
-
-				// Not an image? Bail.
-					if (!href.match(/\.(jpg|gif|png|mp4)$/))
-						return;
-
-				// Prevent default.
-					event.preventDefault();
-					event.stopPropagation();
-
-				// Locked? Bail.
-					if ($modal[0]._locked)
-						return;
-
-				// Lock.
-					$modal[0]._locked = true;
-
-				// Set src.
-					$modalImg.attr('src', href);
-
-				// Set visible.
-					$modal.addClass('visible');
-
-				// Focus.
-					$modal.focus();
-
-				// Delay.
-					setTimeout(function() {
-
-						// Unlock.
-							$modal[0]._locked = false;
-
-					}, 600);
-
-			})
-			.on('click', '.modal', function(event) {
-
-				var $modal = $(this),
-					$modalImg = $modal.find('img');
-
-				// Locked? Bail.
-					if ($modal[0]._locked)
-						return;
-
-				// Already hidden? Bail.
-					if (!$modal.hasClass('visible'))
-						return;
-
-				// Stop propagation.
-					event.stopPropagation();
-
-				// Lock.
-					$modal[0]._locked = true;
-
-				// Clear visible, loaded.
-					$modal
-						.removeClass('loaded')
-
-				// Delay.
-					setTimeout(function() {
-
-						$modal
-							.removeClass('visible')
-
-						setTimeout(function() {
-
-							// Clear src.
-								$modalImg.attr('src', '');
-
-							// Unlock.
-								$modal[0]._locked = false;
-
-							// Focus.
-								$body.focus();
-
-						}, 475);
-
-					}, 125);
-
-			})
-			.on('keypress', '.modal', function(event) {
-
-				var $modal = $(this);
-
-				// Escape? Hide modal.
-					if (event.keyCode == 27)
-						$modal.trigger('click');
-
-			})
-			.on('mouseup mousedown mousemove', '.modal', function(event) {
-
-				// Stop propagation.
-					event.stopPropagation();
-
-			})
-			.prepend('<div class="modal" tabIndex="-1"><div class="inner"><img src="" /></div></div>')
-				.find('img')
-					.on('load', function(event) {
-
-						var $modalImg = $(this),
-							$modal = $modalImg.parents('.modal');
-
-						setTimeout(function() {
-
-							// No longer visible? Bail.
-								if (!$modal.hasClass('visible'))
-									return;
-
-							// Set loaded.
-								$modal.addClass('loaded');
-
-						}, 275);
-
+		fetch("/api/chat", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ message: question }),
+		})
+			.then(function (response) {
+				return response
+					.json()
+					.catch(function () {
+						return { error: "upstream_unavailable", message: "The concierge is having a moment — try again shortly." };
+					})
+					.then(function (data) {
+						return { ok: response.ok, data: data };
 					});
+			})
+			.then(function (result) {
+				typingEl.remove();
+				if (result.ok && result.data.reply) {
+					addMessage(result.data.reply, "msg-assistant");
+				} else {
+					var msg = (result.data && result.data.message) || "The concierge is having a moment — try again shortly.";
+					addMessage(msg, "msg-error");
+				}
+			})
+			.catch(function () {
+				typingEl.remove();
+				addMessage("The concierge is having a moment — try again shortly.", "msg-error");
+			})
+			.finally(function () {
+				concierge.send.disabled = false;
+				if (getQuestionCount() >= MAX_QUESTIONS) {
+					showLimitReached();
+				}
+			});
+	}
 
-})(jQuery);
+	if (concierge.form) {
+		concierge.form.addEventListener("submit", function (e) {
+			e.preventDefault();
+			askConcierge(concierge.input.value);
+		});
+	}
+
+	concierge.suggestions.forEach(function (btn) {
+		btn.addEventListener("click", function () {
+			askConcierge(btn.getAttribute("data-q"));
+		});
+	});
+})();
