@@ -3,26 +3,34 @@
    dark/light theme mechanics (data-theme on <html>), but defines its own
    token palette so this reads as "case study," not "personal homepage." */
 
+/* Palette lifted directly from locomo.co.nz (checked 5 Sept 2026): warm
+   cream #FFF9F4 surface, near-black #231F20 ink, a bright coral #FF594C and
+   a deep burgundy #66142C as its two accent tones, Poppins headings over
+   Inter body copy. Light is the on-brand default; dark is the same brand
+   hues re-stepped for a dark surface, not a different identity. */
 :root {
-	--bg: #12181A;
-	--bg-elevated: #1B2427;
-	--text: #E7F3EF;
-	--text-muted: #8FB0A8;
-	--text-faint: #5E7A73;
-	--accent: #58B09C;
-	--accent-dim: #2F5C4F;
-	--on-accent: #0A1210;
-	--border: #223330;
-	--border-strong: #34504A;
+	--font-display: "Poppins", "Segoe UI", system-ui, sans-serif;
 
-	--lc-verified: #58B09C;
+	--bg: #241512;
+	--bg-elevated: #331E19;
+	--text: #FBEFE6;
+	--text-muted: #D2B4A7;
+	--text-faint: #96776B;
+	--accent: #FF6E58;
+	--accent-dim: #5C2A22;
+	--on-accent: #2A1310;
+	--border: #432924;
+	--border-strong: #5D3931;
+	--brand-2: #E88098;
+
+	--lc-verified: #4FAF8E;
 	--lc-estimated: #7FB3E0;
 	--lc-simulated: #E0B24D;
 	--lc-hypothesis: #B79EDB;
-	--lc-not-visible: #6E7D7A;
+	--lc-not-visible: #8A7A72;
 
 	/* Dataviz categorical palette (skill-validated 8-hue set), dark steps,
-	   checked against this surface (#12181A): all 8 pass contrast/CVD. */
+	   re-checked against this surface (#241512): all 8 pass contrast/CVD. */
 	--cat-1: #3987E5; --cat-2: #D95926; --cat-3: #199E70; --cat-4: #C98500;
 	--cat-5: #D55181; --cat-6: #008300; --cat-7: #9085E9; --cat-8: #E66767;
 	--good: #0CA30C;
@@ -31,27 +39,28 @@
 }
 
 :root[data-theme="light"] {
-	--bg: #F1F4F2;
-	--bg-elevated: #E1E8E4;
-	--text: #1E2A26;
-	--text-muted: #47605A;
-	--text-faint: #7C948D;
-	--accent: #2C7B68;
-	--accent-dim: #DCEBE6;
+	--bg: #FFF9F4;
+	--bg-elevated: #F5E9DC;
+	--text: #231F20;
+	--text-muted: #5C5652;
+	--text-faint: #8D8480;
+	--accent: #E14A3D;
+	--accent-dim: #FCE0DB;
 	--on-accent: #FFFFFF;
-	--border: #D2DBD7;
-	--border-strong: #A9BDB6;
+	--border: #ECE0D2;
+	--border-strong: #D9C7B2;
+	--brand-2: #66142C;
 
 	--lc-verified: #2C7B68;
 	--lc-estimated: #2F6FA8;
 	--lc-simulated: #A87A12;
 	--lc-hypothesis: #7A5FA6;
-	--lc-not-visible: #7C8A85;
+	--lc-not-visible: #7C6F68;
 
-	/* Dataviz categorical palette, light steps, checked against this surface
-	   (#F1F4F2): all 8 pass — 4 slots (orange/aqua/yellow/magenta) sit below
-	   3:1 fill-contrast by design, so those are always paired with a visible
-	   text label (never color alone) wherever they're used below. */
+	/* Dataviz categorical palette, light steps, re-checked against this
+	   surface (#FFF9F4): all 8 pass — 4 slots (orange/aqua/yellow/magenta)
+	   sit below 3:1 fill-contrast by design, so those are always paired
+	   with a visible text label (never color alone) wherever they're used. */
 	--cat-1: #2A78D6; --cat-2: #EB6834; --cat-3: #1BAF7A; --cat-4: #EDA100;
 	--cat-5: #E87BA4; --cat-6: #008300; --cat-7: #4A3AA7; --cat-8: #E34948;
 	--good: #006300;
@@ -126,7 +135,7 @@ main { margin-left: 52px; }
 
 .lc-eyebrow {
 	font-family: var(--font-body); font-weight: 600; font-size: 0.78rem;
-	letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); margin: 0 0 14px;
+	letter-spacing: 0.08em; text-transform: uppercase; color: var(--brand-2); margin: 0 0 14px;
 }
 h1 { font-size: clamp(2.4rem, 6vw, 4rem); line-height: 1.05; margin: 0 0 24px; letter-spacing: -0.01em; }
 h2 { font-size: clamp(1.7rem, 3.6vw, 2.4rem); line-height: 1.15; margin: 0 0 20px; }
@@ -379,7 +388,7 @@ table.lc-table td.lc-num { text-align: right; font-variant-numeric: tabular-nums
 
 /* Screen 10 — closing */
 .lc-closing-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 28px; }
-.lc-btn { display: inline-block; padding: 12px 22px; border-radius: 8px; background: var(--accent); color: var(--on-accent); text-decoration: none; font-weight: 600; font-size: 0.92rem; }
+.lc-btn { display: inline-block; padding: 12px 22px; border-radius: 3px; background: var(--accent); color: var(--on-accent); text-decoration: none; font-weight: 600; font-size: 0.92rem; }
 .lc-btn-ghost { background: transparent; color: var(--text); border: 1px solid var(--border-strong); }
 
 #lc-footer { margin-left: 52px; padding: 40px 0 60px; }
