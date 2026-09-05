@@ -1,4 +1,5 @@
 User-agent: *
 Allow: /
+Disallow: /locomo/
 
 Sitemap: https://durand.nz/sitemap.xml
