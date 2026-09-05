@@ -1,0 +1,14 @@
+_worker.js
+wrangler.toml
+data/
+functions/
+scripts/
+.claude/
+.git/
+.gitignore
+.dev.vars
+.wrangler/
+node_modules/
+README.txt
+LICENSE.txt
+CNAME.txt

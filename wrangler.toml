@@ -1,5 +1,10 @@
 name = "durandcoldicott-github-io"
+main = "_worker.js"
 compatibility_date = "2025-01-01"
+
+[assets]
+directory = "."
+binding = "ASSETS"
 
 # The RATE_LIMIT_KV binding and ANTHROPIC_API_KEY secret are configured
 # directly in the Cloudflare dashboard (Bindings tab / Settings > Environment
