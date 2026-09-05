@@ -1,16 +1,7 @@
-name = "durand-nz"
+name = "durandcoldicott-github-io"
 compatibility_date = "2025-01-01"
-pages_build_output_dir = "."
 
-# Create the namespace once with:
-#   wrangler kv namespace create RATE_LIMIT_KV
-# then paste the returned id below (and re-run for a "--preview" id if you
-# want preview deployments rate-limited separately).
-[[kv_namespaces]]
-binding = "RATE_LIMIT_KV"
-id = "REPLACE_WITH_KV_NAMESPACE_ID"
-
-# ANTHROPIC_API_KEY is NOT set here. Add it as an encrypted environment
-# variable in the Cloudflare Pages dashboard: Settings > Environment
-# variables > Add variable > mark as "Secret" (Production, and Preview if
-# you want the chat working on preview deploys too).
+# The RATE_LIMIT_KV binding and ANTHROPIC_API_KEY secret are configured
+# directly in the Cloudflare dashboard (Bindings tab / Settings > Environment
+# variables) rather than here, so there's no placeholder ID for a real
+# deploy to trip over.
