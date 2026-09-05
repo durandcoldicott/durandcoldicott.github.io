@@ -71,18 +71,28 @@ VERIFIED FACTS ABOUT LOCOMO (from locomo.co.nz, collected 4 Sept 2026):
   interactive recommender.
 - The blog page (locomo.co.nz/blogs/news) exists but shows no visible posts
   as of 4 Sept 2026.
+- Social profiles (real, checked 5 Sept 2026, linked from locomo.co.nz's own
+  footer): Instagram @locomodesign, 605 followers, bio "We believe in
+  design-led assistive technology. To rubbish walking aids we say 'No!' To
+  cool ones we say 'Yo!'". Facebook "Locomo", ~1,200 followers, category
+  Shopping & retail, not yet rated. A real recent Facebook post: "We're
+  exhibiting at the ATSNZ Disability Expo 2026!" — directly confirms the
+  twice-yearly trade-fair duty in Locomo's own job description for this
+  role. Both profiles link to linktr.ee/locomodesign.
 - robots.txt confirms this is a Shopify storefront that explicitly permits
   crawling of public product/collection/page/blog/policy content.
 
 SIMULATED DATA (fabricated for this demo — always label as SIMULATED, and
 frame anything built on it as an illustrative example or a question worth
 asking, never a verdict about Locomo's real business):
-- WORKING ASSUMPTION (Durand's own estimate, not researched): Locomo is
-  treated as primarily a B2B/wholesale business, with the DTC website
-  representing roughly 15% of total revenue. The Growth Dashboard is scoped
-  to that website slice only, because web analytics (GA4-style) only ever
-  sees website behaviour regardless of the real split — the wholesale side
-  runs through separate systems (purchase orders, account reps, invoicing).
+- VERIFIED: Locomo's own job description for this role states outright that
+  "Locomo is predominantly a B2B business." ESTIMATE (Durand's own figure,
+  not researched): the DTC website is treated as roughly 15% of total
+  revenue — the JD doesn't give an exact split. The Growth Dashboard is
+  scoped to that website slice only, because web analytics (GA4-style) only
+  ever sees website behaviour regardless of the real split — the wholesale
+  side runs through separate systems (purchase orders, account reps,
+  invoicing).
 - The Growth Dashboard (interactive, last-30-days default, with 7/30/90-day
   and previous-period/YoY comparison toggles): top-line simulated figures —
   roughly 4,400 sessions/month, ~2.1% conversion rate, blended ROAS 4.0x
@@ -106,6 +116,15 @@ asking, never a verdict about Locomo's real business):
 - Device (simulated): Mobile 48% of sessions but only 1.4% conversion;
   Desktop 42% of sessions at 2.8% conversion — the classic higher-consideration-
   purchase-converts-better-on-a-bigger-screen pattern, illustrative only.
+- Social tab (engagement rate/response time/content-mix simulated, laid over
+  the real follower counts above): Instagram 2.1% engagement, ~14h average
+  response time; Facebook 0.9% engagement, ~22h response time. Simulated
+  content-mix performance ranks real customer stories/testimonials highest,
+  then product demo videos, then lifestyle photography, then trade-show
+  coverage lowest. HYPOTHESIS example: both profiles are still a modest,
+  early-stage organic base, consistent with Paid Social's weaker ROAS on the
+  Acquisition tab — worth growing the organic base with what already works
+  (real customer stories) before leaning harder on paid social spend.
 - Conversion funnel (simulated, last 30 days): Sessions 4,350 → Product page
   view 2,870 → Add to cart 540 → Checkout started 210 → Purchase 91 (2.1%
   overall). Biggest single drop-off is product view → add to cart (~81%).

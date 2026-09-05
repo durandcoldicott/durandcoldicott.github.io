@@ -9,7 +9,36 @@
 export const SOURCE_NOTE =
 	"Collected directly from locomo.co.nz (home, product catalogue, buying guide, " +
 	"stockists, about, brands, shipping/refund policy and blog pages) on 4 Sept 2026, " +
-	"plus the public Locomo case study at digitella.nz/case-studies/locomo/.";
+	"plus the public Locomo case study at digitella.nz/case-studies/locomo/, Locomo's " +
+	"own job description for this role, and Locomo's public Instagram/Facebook pages " +
+	"(checked 5 Sept 2026 — follower counts move, so treat those as a snapshot).";
+
+// Real, public social profiles — linked directly from locomo.co.nz's own
+// footer. Follower counts/bios checked 5 Sept 2026; they'll drift over time,
+// engagement-rate/response-time/content-mix figures elsewhere are simulated.
+export const SOCIAL_PROFILES = {
+	asOf: "5 Sept 2026",
+	instagram: {
+		handle: "@locomodesign",
+		url: "instagram.com/locomodesign",
+		followers: 605,
+		following: 297,
+		bio: "We believe in design-led assistive technology. To rubbish walking aids we say \"No!\" To cool ones we say \"Yo!\"",
+	},
+	facebook: {
+		name: "Locomo",
+		url: "facebook.com/locomodesign",
+		followers: 1200,
+		category: "Shopping & retail",
+		rating: "Not yet rated (1 review) as of 5 Sept 2026",
+		recentPostExample:
+			"A real recent post: \"We're exhibiting at the ATSNZ Disability Expo 2026!\" (2 reactions visible) — " +
+			"directly matches the JD's twice-yearly trade-fair support duty; also visible evidence the " +
+			"team already treats trade shows as a social-content moment, not just an in-person event.",
+	},
+	linkInBio: "linktr.ee/locomodesign",
+	auContact: { phone: "+61 2 4058 4636", email: "hello@locomo.com.au" },
+};
 
 export const COMPANY = {
 	name: "Locomo",

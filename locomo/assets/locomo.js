@@ -1,4 +1,4 @@
-import { SOURCE_NOTE, STOCKISTS, PRODUCTS, VISIBILITY_SCAN } from "/data/locomo-public-data.js";
+import { SOURCE_NOTE, STOCKISTS, PRODUCTS, VISIBILITY_SCAN, SOCIAL_PROFILES } from "/data/locomo-public-data.js";
 import {
 	CONFIDENCE_LEVELS,
 	B2B_CONTEXT,
@@ -8,6 +8,7 @@ import {
 	AD_SPEND,
 	FUNNEL_STAGES,
 	TOP_PATHS,
+	SOCIAL,
 	STOCKIST_PERFORMANCE,
 	PRODUCT_SIGNALS,
 	GEO_OPPORTUNITY,
@@ -139,7 +140,8 @@ function el(tagName, className, text) {
    Screen 4: The Growth Dashboard
    ================================================================ */
 (function growthDashboard() {
-	document.getElementById("lc-b2b-context").textContent = B2B_CONTEXT.text;
+	document.getElementById("lc-b2b-verified").textContent = B2B_CONTEXT.verifiedText;
+	document.getElementById("lc-b2b-estimate").textContent = B2B_CONTEXT.estimateText;
 
 	/* ---- seeded PRNG + deterministic daily series generator ---- */
 	function mulberry32(seed) {
@@ -637,6 +639,87 @@ function el(tagName, className, text) {
 		});
 	}
 
+	/* ---- Social tab: real follower counts/bios, simulated engagement ---- */
+	function renderSocialTab() {
+		document.getElementById("lc-social-note").textContent =
+			"Follower counts and bios are real (checked " + SOCIAL_PROFILES.asOf + "); engagement rate, response time and content-mix performance are simulated.";
+
+		var cardsWrap = document.getElementById("lc-social-cards");
+
+		var igMeta = SOCIAL.platforms.filter(function (p) { return p.key === "instagram"; })[0];
+		var igCard = el("div", "lc-social-card");
+		var igHead = el("div", "lc-social-head");
+		igHead.appendChild(el("h4", null, "Instagram"));
+		var igLink = el("a", null, SOCIAL_PROFILES.instagram.handle);
+		igLink.href = "https://" + SOCIAL_PROFILES.instagram.url;
+		igLink.target = "_blank";
+		igLink.rel = "noopener";
+		igHead.appendChild(igLink);
+		igCard.appendChild(igHead);
+		igCard.appendChild(tag("verified"));
+		igCard.appendChild(el("div", "lc-social-followers", SOCIAL_PROFILES.instagram.followers.toLocaleString()));
+		igCard.appendChild(el("div", "lc-social-followers-label", "followers"));
+		igCard.appendChild(el("p", "lc-social-bio", "“" + SOCIAL_PROFILES.instagram.bio + "”"));
+		var igMetrics = el("div", "lc-social-metrics");
+		var igEng = el("div");
+		igEng.appendChild(el("strong", null, (igMeta.engagementRate * 100).toFixed(1) + "%"));
+		igEng.appendChild(document.createTextNode("engagement rate"));
+		var igResp = el("div");
+		igResp.appendChild(el("strong", null, igMeta.avgResponseTimeHours + "h"));
+		igResp.appendChild(document.createTextNode("avg. response time"));
+		igMetrics.appendChild(igEng);
+		igMetrics.appendChild(igResp);
+		igCard.appendChild(igMetrics);
+		cardsWrap.appendChild(igCard);
+
+		var fbMeta = SOCIAL.platforms.filter(function (p) { return p.key === "facebook"; })[0];
+		var fbCard = el("div", "lc-social-card");
+		var fbHead = el("div", "lc-social-head");
+		fbHead.appendChild(el("h4", null, "Facebook"));
+		var fbLink = el("a", null, SOCIAL_PROFILES.facebook.name);
+		fbLink.href = "https://" + SOCIAL_PROFILES.facebook.url;
+		fbLink.target = "_blank";
+		fbLink.rel = "noopener";
+		fbHead.appendChild(fbLink);
+		fbCard.appendChild(fbHead);
+		fbCard.appendChild(tag("verified"));
+		fbCard.appendChild(el("div", "lc-social-followers", SOCIAL_PROFILES.facebook.followers.toLocaleString()));
+		fbCard.appendChild(el("div", "lc-social-followers-label", "followers · " + SOCIAL_PROFILES.facebook.category));
+		var fbMetrics = el("div", "lc-social-metrics");
+		var fbEng = el("div");
+		fbEng.appendChild(el("strong", null, (fbMeta.engagementRate * 100).toFixed(1) + "%"));
+		fbEng.appendChild(document.createTextNode("engagement rate"));
+		var fbResp = el("div");
+		fbResp.appendChild(el("strong", null, fbMeta.avgResponseTimeHours + "h"));
+		fbResp.appendChild(document.createTextNode("avg. response time"));
+		fbMetrics.appendChild(fbEng);
+		fbMetrics.appendChild(fbResp);
+		fbCard.appendChild(fbMetrics);
+		fbCard.appendChild(el("p", "lc-social-example", SOCIAL_PROFILES.facebook.recentPostExample));
+		cardsWrap.appendChild(fbCard);
+
+		var mixWrap = document.getElementById("lc-social-content-mix");
+		var maxMix = Math.max.apply(null, SOCIAL.contentMix.map(function (c) { return c.performanceIndex; }));
+		SOCIAL.contentMix.slice().sort(function (a, b) { return b.performanceIndex - a.performanceIndex; }).forEach(function (c, i) {
+			var row = el("div", "lc-mini-row");
+			var label = el("div", "lc-mini-label");
+			label.appendChild(el("span", "lc-mini-swatch lc-cat-" + (i + 1)));
+			label.appendChild(document.createTextNode(c.type));
+			row.appendChild(label);
+			var track = el("div", "lc-mini-bar-track");
+			var fill = el("div", "lc-mini-bar-fill-cat lc-cat-" + (i + 1));
+			fill.style.width = Math.round((c.performanceIndex / maxMix) * 100) + "%";
+			track.appendChild(fill);
+			row.appendChild(track);
+			row.appendChild(el("div", "lc-mini-value", c.performanceIndex.toFixed(1)));
+			mixWrap.appendChild(row);
+		});
+
+		var socialInsight = document.getElementById("lc-social-insight");
+		socialInsight.appendChild(tag(SOCIAL.exampleInsight.confidence));
+		socialInsight.appendChild(el("p", null, SOCIAL.exampleInsight.text));
+	}
+
 	/* ---- Weekly AI summary — always visible, independent of the tab/range state.
 	   Fixed to a 7-day-vs-previous-7-day window (that's what "weekly" means),
 	   computed live from the same generator and data as the rest of the
@@ -758,6 +841,7 @@ function el(tagName, className, text) {
 	renderAcquisitionTab();
 	renderProductsTab();
 	renderPathsTab();
+	renderSocialTab();
 	renderWeeklySummary();
 })();
 

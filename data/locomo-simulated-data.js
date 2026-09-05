@@ -20,24 +20,22 @@ export const CONFIDENCE_LEVELS = {
 
 // Screen 4 — The Growth Dashboard. A mocked GA4-style analytics view.
 //
-// WORKING ASSUMPTION (mine, not a researched fact): Locomo reads as primarily
-// a B2B/wholesale business supplying its stockist network, with the DTC
-// website a minority of total revenue — illustratively ~15% here. This also
-// explains the dashboard's scope: web analytics only ever sees website
-// behaviour, so everything below is scoped to that slice regardless of the
-// real split — the wholesale side runs through systems (purchase orders,
-// account reps, invoicing) a tool like this would never see.
+// UPDATE: Locomo's own job description for this role states outright that
+// "Locomo is predominantly a B2B business" — so that half is now VERIFIED,
+// not a guess. The specific ~15% DTC-revenue-share figure is still mine —
+// the JD doesn't give an exact split — so that stays a labelled estimate.
 export const B2B_CONTEXT = {
-	label: "WORKING ASSUMPTION",
+	estimateLabel: "ESTIMATE",
 	b2cShareEstimate: 0.15,
-	text:
-		"I'm assuming Locomo is primarily a B2B/wholesale business — supplying its stockist network " +
-		"directly — with the DTC website a minority of total revenue, illustratively ~15% here. That's " +
-		"my own estimate, not a researched figure Locomo has published. It also shapes what a dashboard " +
-		"like this can show: web analytics (GA4 or similar) only ever sees website behaviour, so " +
-		"everything below is scoped to that slice — the wholesale/stockist side runs through completely " +
-		"different systems (purchase orders, account reps, invoicing) that a tool like this would never " +
-		"see, regardless of what the real split turns out to be.",
+	verifiedText:
+		"Locomo's own job description for this role states outright that \"Locomo is predominantly a " +
+		"B2B business\" — confirmed by Locomo, not assumed by me.",
+	estimateText:
+		"How much of that is DTC website revenue isn't stated, so I'm estimating ~15% here as an " +
+		"illustrative figure, not a researched one. Either way, a dashboard like this only ever sees " +
+		"website behaviour — the wholesale/stockist side runs through completely different systems " +
+		"(purchase orders, account reps, invoicing) that a tool like this would never see, regardless " +
+		"of the real split.",
 };
 
 // Deterministic generator config for the interactive trend chart — see
@@ -80,6 +78,32 @@ export const DEVICES = {
 		{ key: "mobile", label: "Mobile", sessionShare: 0.48, conversionRate: 0.014 },
 		{ key: "tablet", label: "Tablet", sessionShare: 0.10, conversionRate: 0.024 },
 	],
+};
+
+// Social tab: follower counts/bios are REAL (see locomo-public-data.js
+// SOCIAL_PROFILES) — engagement rate, response time and content-mix
+// performance below are simulated. `performanceIndex` is a relative 0–10
+// scale, not a real metric.
+export const SOCIAL = {
+	confidence: "simulated",
+	platforms: [
+		{ key: "instagram", label: "Instagram", engagementRate: 0.021, avgResponseTimeHours: 14 },
+		{ key: "facebook", label: "Facebook", engagementRate: 0.009, avgResponseTimeHours: 22 },
+	],
+	contentMix: [
+		{ type: "Real customer story / testimonial", performanceIndex: 9.1 },
+		{ type: "Product demo / feature video", performanceIndex: 8.4 },
+		{ type: "Lifestyle / brand photography", performanceIndex: 6.2 },
+		{ type: "Trade-show / event coverage", performanceIndex: 5.0 },
+	],
+	exampleInsight: {
+		confidence: "hypothesis",
+		text: "Both real profiles are still a modest, early-stage organic base (605 and ~1,200 followers) — " +
+			"consistent with Paid Social's weaker ROAS on the Acquisition tab. Example of what this would " +
+			"prompt: growing the organic base with the content types that already work best (real customer " +
+			"stories) before leaning harder on paid social spend, rather than treating the two as separate " +
+			"budgets.",
+	},
 };
 
 // Paid channel spend/ROI — last 30 days snapshot. Conversions are

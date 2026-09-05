@@ -134,6 +134,12 @@ h2 { font-size: clamp(1.7rem, 3.6vw, 2.4rem); line-height: 1.15; margin: 0 0 20p
 .lc-method { font-size: 0.92rem; color: var(--text-faint); line-height: 1.6; max-width: 620px; }
 .lc-scroll-cue { margin-top: 56px; color: var(--text-faint); font-size: 0.82rem; }
 
+/* Why this role, why me — fit list */
+.lc-fit-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin: 32px 0 28px; }
+.lc-fit-item { background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; }
+.lc-fit-item h3 { margin: 0 0 8px; font-size: 0.96rem; color: var(--accent); }
+.lc-fit-item p { margin: 0; font-size: 0.86rem; line-height: 1.5; color: var(--text-muted); }
+
 /* Screen 2 — ecosystem chain */
 #lc-ecosystem-chain { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 32px 0 36px; }
 .lc-chain-node {
@@ -171,7 +177,10 @@ h2 { font-size: clamp(1.7rem, 3.6vw, 2.4rem); line-height: 1.15; margin: 0 0 20p
 	color: var(--text); background: var(--border-strong); border-color: transparent;
 	letter-spacing: 0.03em;
 }
-.lc-assumption-box p { margin: 10px 0 0; font-size: 0.88rem; line-height: 1.55; color: var(--text-muted); }
+.lc-assumption-row { display: flex; align-items: flex-start; gap: 10px; }
+.lc-assumption-row + .lc-assumption-row { margin-top: 12px; }
+.lc-assumption-row .lc-tag { flex-shrink: 0; margin-top: 2px; }
+.lc-assumption-box p { margin: 0; font-size: 0.88rem; line-height: 1.55; color: var(--text-muted); }
 
 /* Tabs */
 .lc-dash-tabs { display: flex; gap: 4px; margin: 32px 0 0; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
@@ -353,6 +362,20 @@ table.lc-table td.lc-num { text-align: right; font-variant-numeric: tabular-nums
 .lc-chat-suggestions button:hover { border-color: var(--accent); color: var(--accent); }
 #lc-chat-limit p { font-size: 0.82rem; color: var(--text-faint); margin: 10px 0 0; }
 #lc-chat-limit a { color: var(--accent); }
+
+/* Social tab */
+.lc-social-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-bottom: 8px; }
+.lc-social-card { background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+.lc-social-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 4px; }
+.lc-social-head h4 { margin: 0; font-size: 1rem; font-family: var(--font-display); color: var(--text); }
+.lc-social-head a { font-size: 0.78rem; color: var(--text-faint); }
+.lc-social-followers { font-family: var(--font-display); font-size: 1.6rem; font-weight: 700; color: var(--text); margin: 6px 0 2px; }
+.lc-social-followers-label { font-size: 0.74rem; color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.04em; }
+.lc-social-bio { font-size: 0.86rem; color: var(--text-muted); font-style: italic; line-height: 1.5; margin: 10px 0; }
+.lc-social-metrics { display: flex; gap: 18px; margin: 12px 0; font-size: 0.8rem; color: var(--text-muted); }
+.lc-social-metrics strong { display: block; color: var(--text); font-size: 0.94rem; }
+.lc-social-example { font-size: 0.82rem; color: var(--text-muted); line-height: 1.5; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+.lc-social-card .lc-tag { margin-bottom: 8px; }
 
 /* Screen 10 — closing */
 .lc-closing-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 28px; }
