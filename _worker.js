@@ -1,5 +1,6 @@
 import { KNOWLEDGE_BASE } from "./data/knowledge-base.js";
 import { LOCOMO_KNOWLEDGE_BASE } from "./data/locomo-knowledge-base.js";
+import { handleReo } from "./worker/reo.js";
 
 const MODEL = "claude-haiku-4-5";
 const MAX_INPUT_CHARS = 500;
@@ -148,6 +149,9 @@ async function handleChat(request, env, systemPrompt, notConfiguredMessage) {
 export default {
 	async fetch(request, env, ctx) {
 		const url = new URL(request.url);
+
+		const reo = await handleReo(request, env, url);
+		if (reo) return reo;
 
 		if (request.method === "POST" && (url.pathname === "/api/chat" || url.pathname === "/api/locomo-chat")) {
 			const limited = await checkRateLimit(request, env, url.pathname);

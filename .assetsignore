@@ -13,3 +13,4 @@ node_modules/
 README.txt
 LICENSE.txt
 CNAME.txt
+worker/

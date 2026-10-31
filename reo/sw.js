@@ -3,7 +3,7 @@
  * the cache in the background, so updates appear on the next launch.
  * Bump VERSION when the file list changes.
  */
-var VERSION = "reo-v1";
+var VERSION = "reo-v2";
 var FILES = [
 	"./",
 	"index.html",
@@ -17,7 +17,15 @@ var FILES = [
 ];
 
 self.addEventListener("install", function (e) {
-	e.waitUntil(caches.open(VERSION).then(function (c) { return c.addAll(FILES); }).then(function () { return self.skipWaiting(); }));
+	e.waitUntil(
+		caches.open(VERSION).then(function (c) {
+			return Promise.all(FILES.map(function (f) {
+				return fetch(f, { credentials: "same-origin" }).then(function (res) {
+					if (res.ok && !res.redirected) return c.put(f, res);
+				}).catch(function () {});
+			}));
+		}).then(function () { return self.skipWaiting(); })
+	);
 });
 
 self.addEventListener("activate", function (e) {
@@ -30,12 +38,16 @@ self.addEventListener("activate", function (e) {
 
 self.addEventListener("fetch", function (e) {
 	var req = e.request;
-	if (req.method !== "GET" || new URL(req.url).origin !== self.location.origin) return;
+	var url = new URL(req.url);
+	if (req.method !== "GET" || url.origin !== self.location.origin) return;
+	// Never cache the API (sign-in state, progress, leaderboard) or the login page.
+	if (url.pathname.indexOf("/api/") === 0 || url.pathname.indexOf("/reo/login") === 0) return;
 	e.respondWith(
 		caches.open(VERSION).then(function (cache) {
 			return cache.match(req, { ignoreSearch: true }).then(function (hit) {
 				var fresh = fetch(req).then(function (res) {
-					if (res && res.ok) cache.put(req, res.clone());
+					// a redirect means "not signed in" — don't cache the login page as the app
+					if (res && res.ok && !res.redirected) cache.put(req, res.clone());
 					return res;
 				}).catch(function () { return hit; });
 				return hit || fresh;

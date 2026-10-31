@@ -1,7 +1,7 @@
 /*
  * Reo — a personal te reo Māori study app.
- * Plain JS, no build step. All progress lives in this browser (localStorage);
- * use More → Export to back it up or move it to another device.
+ * Plain JS, no build step. Progress is kept in this browser (localStorage) so
+ * it works offline, and synced to your account via /api/reo (worker/reo.js).
  */
 (function () {
 	"use strict";
@@ -67,7 +67,7 @@
 	// ---------------------------------------------------------------------
 	// State
 	// ---------------------------------------------------------------------
-	var STORE_KEY = "reo.v1";
+	var STORE_KEY = "reo.v1"; // becomes "reo.v1.<username>" once signed in
 
 	function defaultState() {
 		return {
@@ -81,8 +81,8 @@
 			freezeAwardedOn: "",
 			achievements: {}, // id -> date earned
 			proverbs: [],    // indexes unlocked
-			settings: { goal: 10, newPerDay: 5 },
-			stats: { sessions: 0, perfect: 0, typedPerfect: 0, bestStreak: 0, answers: 0, right: 0 },
+			settings: { goal: 10, newPerDay: 5, hideFromBoard: false },
+			stats: { sessions: 0, perfect: 0, typedPerfect: 0, bestStreak: 0, answers: 0, right: 0, weeksWon: 0, wonWeek: "" },
 		};
 	}
 
@@ -101,12 +101,19 @@
 	}
 
 	var storageOk = true;
-	function save() {
+	function saveLocal() {
 		try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); storageOk = true; }
 		catch (e) { storageOk = false; }
 	}
+	// Every change: save on this device now, sync to the server soon.
+	function save() {
+		state.savedAt = Date.now();
+		saveLocal();
+		dirty = true;
+		schedulePush();
+	}
 
-	var state = load();
+	var state = defaultState(); // replaced in boot() once we know who's signed in
 
 	function today() {
 		var k = todayKey();
@@ -262,6 +269,7 @@
 		{ id: "perfect", icon: "💎", mi: "Tika rawa", en: "A perfect lesson (10+ answers, no mistakes)", test: function () { return state.stats.perfect >= 1; } },
 		{ id: "typed", icon: "⌨️", mi: "Ringa tohunga", en: "Type 10 answers perfectly, macrons and all", test: function () { return state.stats.typedPerfect >= 10; } },
 		{ id: "xp1000", icon: "⭐", mi: "Kotahi mano", en: "Earn 1,000 XP", test: function () { return state.xp >= 1000; } },
+		{ id: "champion", icon: "🏆", mi: "Toa o te wiki", en: "Finish a week top of your group", test: function () { return state.stats.weeksWon >= 1; } },
 		{ id: "proverbs7", icon: "📜", mi: "Whakataukī", en: "Collect 7 whakataukī", test: function () { return state.proverbs.length >= 7; } },
 	];
 
@@ -307,6 +315,10 @@
 	}
 	function stripMacrons(s) {
 		return s.replace(/ā/g, "a").replace(/ē/g, "e").replace(/ī/g, "i").replace(/ō/g, "o").replace(/ū/g, "u");
+	}
+	function ago(t) {
+		var m = Math.round((Date.now() - t) / 60000);
+		return m < 1 ? "just now" : m < 60 ? m + " min ago" : Math.round(m / 60) + " h ago";
 	}
 	function plural(n, one, many) { return n + " " + (n === 1 ? one : many || one + "s"); }
 
@@ -507,6 +519,7 @@
 		session.newAchievements = checkAchievements();
 		session.finished = true;
 		save();
+		pushNow();
 		render();
 	}
 
@@ -515,6 +528,7 @@
 			state.stats.sessions++;
 			checkAchievements();
 			save();
+			pushNow();
 		}
 		session = null;
 		render();
@@ -536,7 +550,7 @@
 		setTimeout(function () { el.classList.remove("show"); setTimeout(function () { el.remove(); }, 300); }, 3200);
 	}
 
-	function render() {
+	function render(keepScroll) {
 		if (session) {
 			root.innerHTML = session.finished ? renderSummary() : renderSession();
 			document.body.classList.add("in-session");
@@ -545,17 +559,19 @@
 			var html = "";
 			if (view === "home") html = renderHome();
 			else if (view === "topics") html = topicView ? renderTopic(topicView) : renderTopics();
+			else if (view === "ropu") html = renderRopu();
 			else if (view === "progress") html = renderProgress();
 			else if (view === "more") html = renderMore();
 			root.innerHTML = html + renderTabs();
 		}
-		window.scrollTo(0, 0);
+		if (!keepScroll) window.scrollTo(0, 0);
 	}
 
 	function renderTabs() {
 		var tabs = [
 			["home", "🏠", "Kāinga"],
 			["topics", "🗺️", "Kaupapa"],
+			["ropu", "🏅", "Rōpū"],
 			["progress", "🏆", "Ahunga"],
 			["more", "⚙️", "Ētahi atu"],
 		];
@@ -615,6 +631,7 @@
 			html += '<div class="banner">' + esc(freezeMessage) + "</div>";
 			freezeMessage = "";
 		}
+		if (offline) html += '<div class="banner warn">Offline — your progress is saved on this device and will sync when you reconnect.</div>';
 		if (!storageOk) html += '<div class="banner warn">This browser isn\'t saving progress (private mode?). Export a backup from More.</div>';
 
 		html += '<section class="card streak-card">' +
@@ -634,6 +651,8 @@
 				(newCards().length ? '<button class="btn" data-action="start" data-mode="more">Learn 5 more words</button>' : "") + "</div>";
 		}
 		html += "</div></section>";
+
+		html += standing();
 
 		html += '<section class="card proverb ' + (d.met ? "open" : "locked") + '"><div class="eyebrow">Whakataukī o te rā</div>';
 		if (d.met) {
@@ -747,7 +766,25 @@
 
 	function renderMore() {
 		var s = state.settings;
-		return '<main class="page"><h1>Ētahi atu <span class="muted small">More</span></h1>' +
+		var synced = offline ? "Offline — will sync when you reconnect" : lastSync ? "Synced " + ago(lastSync) : "Not synced yet";
+		var account = '<section class="card"><h2>Kia ora, ' + esc(user ? user.name : "") + '</h2>' +
+			'<p class="muted small">Signed in as @' + esc(user ? user.username : "") + " · " + synced + "</p>" +
+			'<div class="toggle-row"><span>Show me on the group leaderboard</span><button class="chip' + (state.settings.hideFromBoard ? "" : " active") + '" data-action="toggle-board">' + (state.settings.hideFromBoard ? "Hidden" : "Shown") + "</button></div>" +
+			'<details><summary>Change password</summary><form id="password-form" class="mini-form">' +
+			'<input name="current" type="password" autocomplete="current-password" placeholder="Current password" required>' +
+			'<input name="next" type="password" autocomplete="new-password" minlength="8" placeholder="New password (8+ characters)" required>' +
+			'<button class="btn" type="submit">Change password</button></form></details>' +
+			'<button class="btn" data-action="logout">Sign out</button></section>';
+		if (user && user.admin) {
+			account += '<section class="card"><h2>Group admin</h2>' +
+				'<p class="small">Invite code: ' + (user.invite ? '<code class="invite">' + esc(user.invite) + "</code>" : '<span class="muted">not set — add REO_INVITE_CODE in Cloudflare</span>') + "</p>" +
+				'<p class="muted small">Friends sign up at durand.nz/reo with this code.</p>' +
+				'<details><summary>Reset a member\'s password</summary><form id="admin-form" class="mini-form">' +
+				'<input name="username" autocapitalize="none" autocorrect="off" placeholder="Their username" required>' +
+				'<input name="password" type="text" minlength="8" placeholder="New password (8+ characters)" required>' +
+				'<button class="btn" type="submit">Reset password</button></form></details></section>';
+		}
+		return '<main class="page"><h1>Ētahi atu <span class="muted small">More</span></h1>' + account +
 			'<section class="card"><h2>Daily goal</h2><p class="muted small">Answers per day to keep your streak.</p>' + choice("goal", [5, 10, 20, 30], s.goal) +
 			'<h2>New words per day</h2>' + choice("newPerDay", [3, 5, 8, 12], s.newPerDay) + "</section>" +
 
@@ -763,14 +800,14 @@
 			'<p class="muted small">Every syllable ends in a vowel: wha-nau, Ao-te-a-ro-a. A macron (ā) means hold the vowel longer — it can change the meaning.</p>' +
 			'<p class="muted small">For audio, tap "Te Aka ↗" on any word to hear it spoken in Te Aka Māori Dictionary.</p></section>' +
 
-			'<section class="card"><h2>Your progress</h2><p class="muted small">Progress is saved only in this browser. Back it up, or move it to another device.</p>' +
+			'<section class="card"><h2>Your progress</h2><p class="muted small">Your progress syncs to your account automatically. You can also keep a backup file.</p>' +
 			'<div class="btn-row"><button class="btn" data-action="export">Export backup</button>' +
 			'<label class="btn">Import backup<input type="file" accept="application/json,.json" id="import-file" hidden></label></div>' +
 			'<button class="btn danger" data-action="reset">Reset all progress</button></section>' +
 
 			'<section class="card"><h2>About the words</h2><p class="small">This deck is a hand-curated draft, not machine translation. Each word links to <a href="https://maoridictionary.co.nz" target="_blank" rel="noopener">Te Aka Māori Dictionary</a>, the authority. If something here disagrees with Te Aka, trust Te Aka. Spelling follows <a href="https://www.tetaurawhiri.govt.nz" target="_blank" rel="noopener">Te Taura Whiri i te Reo Māori</a> (Māori Language Commission) conventions.</p>' +
 			'<p class="muted small">' + CARDS.length + " cards · " + TOPICS.length + " topics · " + DECK.proverbs.length + " whakataukī</p></section>" +
-			'<p class="install-hint muted small">Tip: use "Add to Home Screen" in your phone\'s browser menu to install Reo like an app. It works offline.</p>' +
+			'<p class="install-hint muted small">Tip: use "Add to Home Screen" in your phone\'s browser menu to install Reo like an app. It keeps working offline and syncs when you\'re back online.</p>' +
 			"</main>";
 	}
 
@@ -934,6 +971,8 @@
 				if (!confirm("Replace your current progress with this backup?")) return;
 				localStorage.setItem(STORE_KEY, JSON.stringify(s));
 				state = load();
+				save();
+				pushNow();
 				toast("Backup restored.");
 				render();
 			} catch (e) {
@@ -948,7 +987,20 @@
 		if (!el || el.tagName === "FORM") return;
 		var a = el.getAttribute("data-action");
 		switch (a) {
-			case "tab": view = el.getAttribute("data-tab"); topicView = null; render(); break;
+			case "tab":
+				view = el.getAttribute("data-tab");
+				topicView = null;
+				render();
+				if (view === "ropu" || view === "home") refreshBoard();
+				break;
+			case "board": boardMetric = el.getAttribute("data-metric"); render(true); break;
+			case "toggle-board":
+				state.settings.hideFromBoard = !state.settings.hideFromBoard;
+				save();
+				pushNow();
+				render(true);
+				break;
+			case "logout": logout(); break;
 			case "topic": topicView = el.getAttribute("data-topic"); render(); break;
 			case "back": topicView = null; render(); break;
 			case "start": startSession(el.getAttribute("data-mode"), el.getAttribute("data-topic")); break;
@@ -978,13 +1030,15 @@
 			case "setting":
 				state.settings[el.getAttribute("data-name")] = +el.getAttribute("data-value");
 				save();
-				render();
+				pushNow();
+				render(true);
 				break;
 			case "export": exportData(); break;
 			case "reset":
 				if (confirm("Delete ALL progress, streaks and achievements? This can't be undone.") && confirm("Really? Consider exporting a backup first.")) {
 					state = defaultState();
 					save();
+					pushNow();
 					toast("Progress reset.");
 					render();
 				}
@@ -994,7 +1048,10 @@
 
 	root.addEventListener("submit", function (e) {
 		e.preventDefault();
-		onType(false);
+		var form = e.target;
+		if (form.id === "password-form") changePassword(form);
+		else if (form.id === "admin-form") adminReset(form);
+		else onType(false);
 	});
 
 	root.addEventListener("change", function (e) {
@@ -1017,18 +1074,358 @@
 	// PWAs alive for days).
 	var lastDay = todayKey();
 	document.addEventListener("visibilitychange", function () {
-		if (document.visibilityState === "visible" && todayKey() !== lastDay) {
-			lastDay = todayKey();
-			reconcileFreezes();
-			if (!session) render();
+		if (document.visibilityState === "hidden") {
+			if (dirty) pushNow(true);
+			return;
 		}
+		// back in the foreground: pick up progress from other devices
+		pull().then(function () {
+			if (todayKey() !== lastDay) {
+				lastDay = todayKey();
+				reconcileFreezes();
+			}
+			if (!session) render(true);
+			refreshBoard();
+		});
 	});
+	window.addEventListener("online", function () { offline = false; pull().then(function () { if (!session) render(true); }); });
+
+	// ---------------------------------------------------------------------
+	// Account & sync
+	// Progress is kept on this device (works offline) and synced to the
+	// server under your account. If two devices both changed, the copies are
+	// merged rather than one overwriting the other.
+	// ---------------------------------------------------------------------
+	var API = "/api/reo/";
+	var user = null;
+	var offline = false;
+	var dirty = false;
+	var serverSavedAt = 0;
+	var lastSync = 0;
+	var pushTimer = null;
+	var pushing = false;
+	var pushAgain = false;
+
+	function AuthError() { this.message = "auth"; }
+
+	function api(method, path, body, keepalive) {
+		var opts = { method: method, credentials: "same-origin", headers: {} };
+		if (body !== undefined) {
+			opts.headers["Content-Type"] = "application/json";
+			opts.body = JSON.stringify(body);
+			if (keepalive && opts.body.length < 60000) opts.keepalive = true;
+		}
+		return fetch(API + path, opts).then(function (r) {
+			return r.json().catch(function () { return {}; }).then(function (data) {
+				if (r.status === 401) { location.href = "/reo/login"; throw new AuthError(); }
+				return { status: r.status, ok: r.ok, data: data };
+			});
+		});
+	}
+
+	function mergeStates(a, b) {
+		if (!a) return b;
+		if (!b) return a;
+		var newer = (a.savedAt || 0) >= (b.savedAt || 0) ? a : b;
+		var older = newer === a ? b : a;
+		var m = JSON.parse(JSON.stringify(newer));
+		var oc = older.cards || {};
+		Object.keys(oc).forEach(function (id) {
+			var o = oc[id], n = m.cards[id];
+			if (!n || (o.right + o.wrong) > (n.right + n.wrong)) m.cards[id] = o;
+		});
+		var od = older.days || {};
+		Object.keys(od).forEach(function (k) {
+			var o = od[k], n = m.days[k];
+			if (!n || o.reviews > n.reviews) m.days[k] = o;
+			else if (o.met) n.met = true;
+		});
+		m.xp = Math.max(a.xp || 0, b.xp || 0);
+		m.created = (a.created || "9") < (b.created || "9") ? a.created : b.created;
+		(older.frozen || []).forEach(function (k) { if (m.frozen.indexOf(k) === -1) m.frozen.push(k); });
+		(older.proverbs || []).forEach(function (k) { if (m.proverbs.indexOf(k) === -1) m.proverbs.push(k); });
+		var oa = older.achievements || {};
+		Object.keys(oa).forEach(function (k) { if (!m.achievements[k] || oa[k] < m.achievements[k]) m.achievements[k] = oa[k]; });
+		var os = older.stats || {};
+		Object.keys(os).forEach(function (k) {
+			if (typeof os[k] === "number") m.stats[k] = Math.max(m.stats[k] || 0, os[k]);
+			else if (os[k] > (m.stats[k] || "")) m.stats[k] = os[k];
+		});
+		return m;
+	}
+
+	function weekStart(key) { return addDays(key, -dayOfWeek(key)); }
+
+	// What the group leaderboard shows about you.
+	function summary() {
+		var t = todayKey(), wk = weekStart(t), pk = addDays(wk, -7);
+		var wx = 0, px = 0;
+		for (var i = 0; i < 7; i++) {
+			var d = state.days[addDays(wk, i)], e = state.days[addDays(pk, i)];
+			if (d) wx += d.xp;
+			if (e) px += e.xp;
+		}
+		var lm = "";
+		Object.keys(state.days).forEach(function (k) { if (state.days[k].met && k > lm) lm = k; });
+		return { xp: state.xp, wk: wk, wx: wx, px: px, st: currentStreak(), lm: lm, lr: solidCount(), h: !!state.settings.hideFromBoard };
+	}
+
+	function stripped(s) {
+		var c = JSON.parse(JSON.stringify(s));
+		delete c.savedAt;
+		return JSON.stringify(c);
+	}
+
+	function pull() {
+		if (!user) return Promise.resolve();
+		return api("GET", "progress").then(function (r) {
+			if (!r.ok) return;
+			offline = false;
+			var remote = r.data.state;
+			serverSavedAt = r.data.savedAt || 0;
+			if (!remote) {
+				if (state.xp || Object.keys(state.cards).length) return push();
+				return;
+			}
+			if (session) return; // don't swap state mid-lesson; the next push will merge
+			var merged = mergeStates(state, remote);
+			state = merged;
+			saveLocal();
+			lastSync = Date.now();
+			if (stripped(merged) !== stripped(remote)) return push();
+			dirty = false;
+		}).catch(function (e) {
+			if (!(e instanceof AuthError)) offline = true;
+		});
+	}
+
+	function push(keepalive) {
+		if (!user) return Promise.resolve();
+		if (pushing) { pushAgain = true; return Promise.resolve(); }
+		pushing = true;
+		clearTimeout(pushTimer);
+		var attempt = function (tries) {
+			return api("PUT", "progress", { state: state, base: serverSavedAt, summary: summary() }, keepalive).then(function (r) {
+				if (r.status === 409 && tries > 0) {
+					state = mergeStates(state, r.data.state);
+					serverSavedAt = r.data.savedAt;
+					saveLocal();
+					return attempt(tries - 1);
+				}
+				if (r.ok) {
+					serverSavedAt = r.data.savedAt;
+					state.savedAt = state.savedAt || serverSavedAt;
+					dirty = false;
+					offline = false;
+					lastSync = Date.now();
+				}
+			});
+		};
+		return attempt(2).catch(function (e) {
+			if (!(e instanceof AuthError)) offline = true;
+		}).then(function () {
+			pushing = false;
+			if (pushAgain) { pushAgain = false; return push(); }
+		});
+	}
+	function pushNow(keepalive) { return push(keepalive); }
+	// While you're answering questions, sync a minute after the last change.
+	function schedulePush() {
+		clearTimeout(pushTimer);
+		pushTimer = setTimeout(push, 60000);
+	}
+
+	function logout() {
+		var go = function () {
+			api("POST", "logout", {}).catch(function () {}).then(function () {
+				try {
+					localStorage.removeItem(STORE_KEY);
+					localStorage.removeItem("reo.lastUser");
+				} catch (e) {}
+				location.href = "/reo/login";
+			});
+		};
+		if (dirty) push().then(go); else go();
+	}
+
+	function formData(form) {
+		var d = {};
+		new FormData(form).forEach(function (v, k) { d[k] = String(v); });
+		return d;
+	}
+
+	function changePassword(form) {
+		var d = formData(form);
+		api("POST", "password", { current: d.current, next: d.next }).then(function (r) {
+			toast(r.ok ? "Password changed." : r.data.error || "Couldn't change password.");
+			if (r.ok) form.reset();
+		}).catch(function () { toast("Can't reach the server."); });
+	}
+
+	function adminReset(form) {
+		var d = formData(form);
+		api("POST", "admin/reset", { username: d.username.trim().toLowerCase(), password: d.password }).then(function (r) {
+			toast(r.ok ? "Password reset for " + d.username + "." : r.data.error || "Couldn't reset.");
+			if (r.ok) form.reset();
+		}).catch(function () { toast("Can't reach the server."); });
+	}
+
+	// ---------------------------------------------------------------------
+	// Group leaderboard
+	// ---------------------------------------------------------------------
+	var board = null;      // other members' summaries from the server
+	var boardAt = 0;
+	var boardMetric = "week";
+
+	function refreshBoard(force) {
+		if (!user || (!force && Date.now() - boardAt < 60000)) return;
+		boardAt = Date.now();
+		api("GET", "leaderboard").then(function (r) {
+			if (!r.ok) return;
+			board = r.data.members || [];
+			checkWeekWin();
+			if (!session && (view === "home" || view === "ropu")) render(true);
+		}).catch(function () {});
+	}
+
+	function boardRows() {
+		var t = todayKey(), wk = weekStart(t), pwk = addDays(wk, -7), yest = addDays(t, -1);
+		var mine = summary();
+		mine.u = user.username;
+		mine.n = user.name;
+		var all = (board || []).filter(function (e) { return e.u !== user.username; }).concat([mine]);
+		return all.map(function (e) {
+			return {
+				u: e.u,
+				n: e.n || e.u,
+				me: e.u === user.username,
+				week: e.wk === wk ? e.wx : 0,
+				last: e.wk === wk ? e.px : e.wk === pwk ? e.wx : 0,
+				streak: e.lm && e.lm >= yest ? e.st : 0,
+				words: e.lr || 0,
+				xp: e.xp || 0,
+				today: e.lm === t,
+			};
+		});
+	}
+
+	function ranked(metric) {
+		return boardRows().sort(function (a, b) { return b[metric] - a[metric] || (a.me ? -1 : b.me ? 1 : 0); });
+	}
+
+	function lastWeekWinner() {
+		var rows = ranked("last");
+		if (rows.length < 2 || !rows[0].last || rows[0].last === rows[1].last) return null;
+		return rows[0];
+	}
+
+	function checkWeekWin() {
+		var w = lastWeekWinner();
+		var pwk = addDays(weekStart(todayKey()), -7);
+		if (w && w.me && state.stats.wonWeek !== pwk) {
+			state.stats.weeksWon++;
+			state.stats.wonWeek = pwk;
+			checkAchievements();
+			save();
+			toast("🏆 You topped the group last week!");
+		}
+	}
+
+	// One line for the home screen: where you stand this week.
+	function standing() {
+		if (!board) return "";
+		var rows = ranked("week");
+		if (rows.length < 2) return "";
+		var i = 0;
+		while (!rows[i].me) i++;
+		var me = rows[i];
+		var line;
+		if (i === 0) {
+			var gap = me.week - rows[1].week;
+			line = gap > 0 ? "You're leading by " + gap + " XP over " + esc(rows[1].n) : "You're tied for first with " + esc(rows[1].n);
+		} else {
+			var ahead = rows[i - 1];
+			line = "#" + (i + 1) + " of " + rows.length + " · " + (ahead.week - me.week || "a few") + " XP behind " + esc(ahead.n);
+		}
+		return '<button class="card standing" data-action="tab" data-tab="ropu"><span class="standing-icon">' + (i === 0 ? "🥇" : "🏅") + '</span><span><span class="eyebrow">Rōpū this week</span><br>' + line + '</span><span class="chev">›</span></button>';
+	}
+
+	function renderRopu() {
+		var metrics = [["week", "This week"], ["streak", "Streaks"], ["words", "Words"], ["xp", "All-time"]];
+		var units = { week: "XP", streak: "days", words: "words", xp: "XP" };
+		var html = '<main class="page"><h1>Rōpū <span class="muted small">Your group</span></h1>';
+		var w = lastWeekWinner();
+		if (w) html += '<div class="banner">🏆 Last week: <b>' + esc(w.n) + "</b> won with " + w.last + " XP" + (w.me ? " — that's you!" : "") + "</div>";
+		html += '<div class="choices">' + metrics.map(function (m) {
+			return '<button class="chip' + (boardMetric === m[0] ? " active" : "") + '" data-action="board" data-metric="' + m[0] + '">' + m[1] + "</button>";
+		}).join("") + "</div>";
+
+		if (!board) {
+			html += '<p class="muted">' + (offline ? "You're offline — the leaderboard will load when you reconnect." : "Loading…") + "</p>";
+		} else {
+			var rows = ranked(boardMetric);
+			html += '<ol class="board">';
+			rows.forEach(function (r, i) {
+				var rank = r[boardMetric] > 0 && i < 3 ? ["🥇", "🥈", "🥉"][i] : String(i + 1);
+				html += '<li class="row' + (r.me ? " me" : "") + '"><span class="rank">' + rank + "</span>" +
+					'<span class="avatar">' + esc(r.n.charAt(0).toUpperCase()) + "</span>" +
+					'<span class="who"><strong>' + esc(r.n) + (r.me ? ' <span class="muted small">(you)</span>' : "") + "</strong>" +
+					(r.today ? '<span class="pill">✓ practised today</span>' : r.streak ? '<span class="pill warn">🔥 streak at risk</span>' : "") + "</span>" +
+					'<span class="score"><strong>' + r[boardMetric] + "</strong><small>" + units[boardMetric] + "</small></span></li>";
+			});
+			html += "</ol>";
+			if (rows.length < 2) html += '<p class="muted">It\'s just you so far. Share the invite code and durand.nz/reo with friends to get a league going.</p>';
+			if (boardMetric === "week") {
+				var left = 7 - dayOfWeek(todayKey());
+				html += '<p class="muted small center">The weekly league resets on Monday · ' + (left === 1 ? "last day!" : left + " days left") + "</p>";
+			}
+		}
+		if (state.settings.hideFromBoard) html += '<p class="muted small center">You\'re hidden from others (change in More).</p>';
+		html += "</main>";
+		return html;
+	}
+
+	// ---------------------------------------------------------------------
+	// Start-up: who's signed in, load their progress, then sync.
+	// ---------------------------------------------------------------------
+	function boot() {
+		api("GET", "me").then(function (r) {
+			if (!r.ok) throw new Error("server");
+			return r.data;
+		}).catch(function (e) {
+			if (e instanceof AuthError) throw e;
+			offline = true; // no connection: carry on with what's on this device
+			var cached = null;
+			try { cached = JSON.parse(localStorage.getItem("reo.lastUser")); } catch (x) {}
+			if (!cached) throw new Error("offline");
+			return cached;
+		}).then(function (me) {
+			user = me;
+			try { localStorage.setItem("reo.lastUser", JSON.stringify(me)); } catch (x) {}
+			STORE_KEY = "reo.v1." + me.username;
+			try {
+				// adopt progress saved before accounts existed
+				if (!localStorage.getItem(STORE_KEY) && localStorage.getItem("reo.v1")) {
+					localStorage.setItem(STORE_KEY, localStorage.getItem("reo.v1"));
+					localStorage.removeItem("reo.v1");
+				}
+			} catch (x) {}
+			state = load();
+			return offline ? null : pull();
+		}).then(function () {
+			reconcileFreezes();
+			render();
+			refreshBoard(true);
+		}).catch(function (e) {
+			if (e instanceof AuthError) return;
+			root.innerHTML = '<main class="page"><h1>Reo</h1><p>You\'re offline and haven\'t signed in on this device yet. Connect to the internet and try again.</p></main>';
+		});
+	}
 
 	// ---------------------------------------------------------------------
 	// Boot
 	// ---------------------------------------------------------------------
-	reconcileFreezes();
-	render();
+	boot();
 
 	if ("serviceWorker" in navigator && location.protocol !== "file:") {
 		window.addEventListener("load", function () {
@@ -1037,5 +1434,5 @@
 	}
 
 	// test hook
-	window.__reo = { state: function () { return state; }, CARDS: CARDS, schedule: schedule, addDays: addDays, currentStreak: currentStreak };
+	window.__reo = { state: function () { return state; }, mergeStates: mergeStates, summary: summary, pushNow: pushNow, CARDS: CARDS, schedule: schedule, addDays: addDays, currentStreak: currentStreak };
 })();

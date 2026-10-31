@@ -5,6 +5,9 @@ compatibility_date = "2026-08-30"
 [assets]
 directory = "."
 binding = "ASSETS"
+# /reo (the te reo app) is behind a login, so its static files must go
+# through the Worker's session check instead of being served directly.
+run_worker_first = ["/reo", "/reo/*"]
 
 [[kv_namespaces]]
 binding = "RATE_LIMIT_KV"
@@ -14,3 +17,10 @@ id = "f19f1acb96f440ee9e2361c34a2eaa27"
 # dashboard (Settings > Environment variables) — it must never be written
 # here in plain text, and a plain "wrangler deploy" doesn't touch secrets
 # set that way, so it's unaffected by this file.
+
+# /reo uses two more secrets, also set in the dashboard as type "Secret":
+#   REO_INVITE_CODE  the code people need to create an account
+#   REO_ADMINS       comma-separated usernames who can see the invite code
+#                    and reset members' passwords
+# Its data lives in RATE_LIMIT_KV under the "reo:" prefix (or in a REO_KV
+# namespace, if you bind one).
