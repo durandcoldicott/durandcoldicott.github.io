@@ -1,0 +1,1041 @@
+/*
+ * Reo — a personal te reo Māori study app.
+ * Plain JS, no build step. All progress lives in this browser (localStorage);
+ * use More → Export to back it up or move it to another device.
+ */
+(function () {
+	"use strict";
+
+	// ---------------------------------------------------------------------
+	// Deck
+	// ---------------------------------------------------------------------
+	var DECK = window.REO_DECK;
+	var TOPICS = [];
+	var CARDS = [];
+	var CARD_BY_ID = {};
+
+	function slug(s) {
+		return s.toLowerCase().replace(/_+/g, "x").replace(/[^a-z0-9āēīōū]+/g, "-").replace(/^-|-$/g, "");
+	}
+
+	DECK.topics.forEach(function (t) {
+		var topic = { id: t.id, mi: t.mi, en: t.en, icon: t.icon, cards: [] };
+		t.cards.forEach(function (raw) {
+			var extra = raw[2] || {};
+			var card = {
+				id: t.id + "-" + slug(raw[0]),
+				mi: raw[0],
+				en: raw[1],
+				alt: extra.alt || [],
+				note: extra.note || "",
+				lookup: extra.lookup || raw[0].replace(/_+/g, "").replace(/[?!.,]/g, "").replace(/\s+/g, " ").trim(),
+				ex: extra.ex || "",
+				exEn: extra.exEn || "",
+				topic: t.id,
+				pattern: raw[0].indexOf("___") !== -1,
+			};
+			if (CARD_BY_ID[card.id]) card.id += "-2";
+			CARD_BY_ID[card.id] = card;
+			CARDS.push(card);
+			topic.cards.push(card);
+		});
+		TOPICS.push(topic);
+	});
+	var TOPIC_BY_ID = {};
+	TOPICS.forEach(function (t) { TOPIC_BY_ID[t.id] = t; });
+
+	function teAkaUrl(card) {
+		return "https://maoridictionary.co.nz/search?keywords=" + encodeURIComponent(card.lookup);
+	}
+
+	// ---------------------------------------------------------------------
+	// Dates (local time, YYYY-MM-DD keys compare correctly as strings)
+	// ---------------------------------------------------------------------
+	function dateKey(d) {
+		return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+	}
+	function todayKey() { return dateKey(new Date()); }
+	function addDays(key, n) {
+		var p = key.split("-").map(Number);
+		return dateKey(new Date(p[0], p[1] - 1, p[2] + n));
+	}
+	function dayOfWeek(key) { // 0 = Monday
+		var p = key.split("-").map(Number);
+		return (new Date(p[0], p[1] - 1, p[2]).getDay() + 6) % 7;
+	}
+
+	// ---------------------------------------------------------------------
+	// State
+	// ---------------------------------------------------------------------
+	var STORE_KEY = "reo.v1";
+
+	function defaultState() {
+		return {
+			version: 1,
+			created: todayKey(),
+			cards: {},       // id -> { reps, interval, ease, due, lapses, right, wrong, first }
+			days: {},        // date -> { reviews, xp, right, wrong, newCount, met }
+			xp: 0,
+			freezes: 0,
+			frozen: [],      // dates covered by a streak freeze
+			freezeAwardedOn: "",
+			achievements: {}, // id -> date earned
+			proverbs: [],    // indexes unlocked
+			settings: { goal: 10, newPerDay: 5 },
+			stats: { sessions: 0, perfect: 0, typedPerfect: 0, bestStreak: 0, answers: 0, right: 0 },
+		};
+	}
+
+	function load() {
+		var s = null;
+		try { s = JSON.parse(localStorage.getItem(STORE_KEY)); } catch (e) { s = null; }
+		var d = defaultState();
+		if (!s || typeof s !== "object") return d;
+		// shallow-merge so new fields appear after updates
+		Object.keys(d).forEach(function (k) {
+			if (s[k] === undefined) s[k] = d[k];
+		});
+		s.settings = Object.assign({}, d.settings, s.settings);
+		s.stats = Object.assign({}, d.stats, s.stats);
+		return s;
+	}
+
+	var storageOk = true;
+	function save() {
+		try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); storageOk = true; }
+		catch (e) { storageOk = false; }
+	}
+
+	var state = load();
+
+	function today() {
+		var k = todayKey();
+		if (!state.days[k]) state.days[k] = { reviews: 0, xp: 0, right: 0, wrong: 0, newCount: 0, met: false };
+		return state.days[k];
+	}
+
+	// ---------------------------------------------------------------------
+	// Streaks & freezes
+	// ---------------------------------------------------------------------
+	function isCovered(k) {
+		return !!(state.days[k] && state.days[k].met) || state.frozen.indexOf(k) !== -1;
+	}
+
+	function currentStreak() {
+		var k = todayKey();
+		if (!isCovered(k)) k = addDays(k, -1);
+		var n = 0;
+		var guard = 0;
+		while (isCovered(k) && guard++ < 5000) {
+			if (state.days[k] && state.days[k].met) n++;
+			k = addDays(k, -1);
+		}
+		return n;
+	}
+
+	// On open: if days were missed since the last practised day, spend freezes
+	// to cover them — but only if there are enough to save the streak.
+	var freezeMessage = "";
+	function reconcileFreezes() {
+		var t = todayKey();
+		var k = addDays(t, -1);
+		var gap = [];
+		while (k >= state.created && !isCovered(k)) {
+			gap.push(k);
+			k = addDays(k, -1);
+		}
+		if (k < state.created || gap.length === 0) return;
+		if (gap.length <= state.freezes) {
+			state.frozen = state.frozen.concat(gap);
+			state.freezes -= gap.length;
+			freezeMessage = "❄️ A streak freeze covered " + (gap.length === 1 ? "yesterday" : gap.length + " missed days") + ". Your streak is safe!";
+			save();
+		}
+	}
+
+	// ---------------------------------------------------------------------
+	// Levels & XP
+	// ---------------------------------------------------------------------
+	var LEVELS = [
+		{ xp: 0, mi: "Pīpī", en: "Fledgling" },
+		{ xp: 300, mi: "Tauira", en: "Student" },
+		{ xp: 1000, mi: "Kaikōrero", en: "Speaker" },
+		{ xp: 2500, mi: "Pūkenga", en: "Skilled one" },
+		{ xp: 5000, mi: "Mātanga", en: "Expert" },
+		{ xp: 10000, mi: "Kaitiaki o te reo", en: "Guardian of the language" },
+	];
+	function levelInfo(xp) {
+		var i = 0;
+		while (i + 1 < LEVELS.length && xp >= LEVELS[i + 1].xp) i++;
+		var next = LEVELS[i + 1];
+		return {
+			n: i + 1,
+			lvl: LEVELS[i],
+			next: next,
+			pct: next ? (xp - LEVELS[i].xp) / (next.xp - LEVELS[i].xp) : 1,
+		};
+	}
+
+	// ---------------------------------------------------------------------
+	// Card status
+	// ---------------------------------------------------------------------
+	var LEARNED_DAYS = 7;   // "learned" = scheduled at least a week out
+	var MASTERED_DAYS = 21;
+
+	function cardStatus(card) {
+		var cs = state.cards[card.id];
+		if (!cs) return "new";
+		if (cs.interval >= MASTERED_DAYS) return "mastered";
+		if (cs.interval >= LEARNED_DAYS) return "learned";
+		return "learning";
+	}
+	function counts(cards) {
+		var c = { new: 0, learning: 0, learned: 0, mastered: 0, total: cards.length };
+		cards.forEach(function (card) { c[cardStatus(card)]++; });
+		c.seen = c.total - c.new;
+		c.solid = c.learned + c.mastered;
+		return c;
+	}
+	function isDue(card) {
+		var cs = state.cards[card.id];
+		return !!cs && cs.due <= todayKey();
+	}
+	function knows(card) { // "got it" — answered right at least twice in a row
+		var cs = state.cards[card.id];
+		return !!cs && cs.reps >= 2;
+	}
+
+	// ---------------------------------------------------------------------
+	// Spaced repetition (SM-2 style)
+	// grade: 0 again, 1 hard, 2 good, 3 easy
+	// ---------------------------------------------------------------------
+	function schedule(cardId, grade) {
+		var cs = state.cards[cardId];
+		if (!cs) {
+			cs = state.cards[cardId] = { reps: 0, interval: 0, ease: 2.5, due: todayKey(), lapses: 0, right: 0, wrong: 0, first: todayKey() };
+		}
+		if (grade === 0) {
+			if (cs.reps > 0) cs.lapses++;
+			cs.reps = 0;
+			cs.interval = 0;
+			cs.ease = Math.max(1.3, cs.ease - 0.2);
+			cs.due = todayKey();
+			cs.wrong++;
+			return;
+		}
+		cs.right++;
+		var iv;
+		if (grade === 1) {
+			iv = Math.max(1, Math.round(cs.interval * 1.2));
+			cs.ease = Math.max(1.3, cs.ease - 0.15);
+		} else {
+			if (cs.reps === 0) iv = 1;
+			else if (cs.reps === 1) iv = 3;
+			else iv = Math.round(cs.interval * cs.ease);
+			if (grade === 3) {
+				iv = Math.round(Math.max(iv, 1) * 1.3) + 1;
+				cs.ease += 0.15;
+			}
+		}
+		cs.reps++;
+		cs.interval = Math.min(iv, 365);
+		cs.due = addDays(todayKey(), cs.interval);
+	}
+
+	// ---------------------------------------------------------------------
+	// Achievements
+	// ---------------------------------------------------------------------
+	function topicKnown(id) { return TOPIC_BY_ID[id].cards.every(knows); }
+	function solidCount() { return CARDS.filter(function (c) { var s = cardStatus(c); return s === "learned" || s === "mastered"; }).length; }
+
+	var ACHIEVEMENTS = [
+		{ id: "first", icon: "🌱", mi: "Te Tīmatanga", en: "Finish your first lesson", test: function () { return state.stats.sessions >= 1; } },
+		{ id: "streak3", icon: "🔥", mi: "Toru rā", en: "3-day streak", test: function () { return state.stats.bestStreak >= 3; } },
+		{ id: "streak7", icon: "🔥", mi: "Kotahi wiki", en: "7-day streak", test: function () { return state.stats.bestStreak >= 7; } },
+		{ id: "streak30", icon: "🌕", mi: "Kotahi marama", en: "30-day streak", test: function () { return state.stats.bestStreak >= 30; } },
+		{ id: "mihi", icon: "👋", mi: "Kia ora!", en: "Know all the greetings", test: function () { return topicKnown("mihi"); } },
+		{ id: "pepeha", icon: "⛰️", mi: "Taku pepeha", en: "Know all the pepeha patterns — now write yours", test: function () { return topicKnown("pepeha"); } },
+		{ id: "count", icon: "🔢", mi: "Tatau", en: "Know all the numbers", test: function () { return topicKnown("tau"); } },
+		{ id: "days", icon: "📅", mi: "Ngā rā", en: "Know all the days and time words", test: function () { return topicKnown("wa"); } },
+		{ id: "words25", icon: "📗", mi: "Rua tekau mā rima", en: "25 words learned", test: function () { return solidCount() >= 25; } },
+		{ id: "words100", icon: "📚", mi: "Kotahi rau", en: "100 words learned", test: function () { return solidCount() >= 100; } },
+		{ id: "perfect", icon: "💎", mi: "Tika rawa", en: "A perfect lesson (10+ answers, no mistakes)", test: function () { return state.stats.perfect >= 1; } },
+		{ id: "typed", icon: "⌨️", mi: "Ringa tohunga", en: "Type 10 answers perfectly, macrons and all", test: function () { return state.stats.typedPerfect >= 10; } },
+		{ id: "xp1000", icon: "⭐", mi: "Kotahi mano", en: "Earn 1,000 XP", test: function () { return state.xp >= 1000; } },
+		{ id: "proverbs7", icon: "📜", mi: "Whakataukī", en: "Collect 7 whakataukī", test: function () { return state.proverbs.length >= 7; } },
+	];
+
+	function checkAchievements() {
+		var earned = [];
+		ACHIEVEMENTS.forEach(function (a) {
+			if (!state.achievements[a.id] && a.test()) {
+				state.achievements[a.id] = todayKey();
+				earned.push(a);
+			}
+		});
+		return earned;
+	}
+
+	// ---------------------------------------------------------------------
+	// Proverb of the day
+	// ---------------------------------------------------------------------
+	function proverbIndex(key) {
+		var p = key.split("-").map(Number);
+		var dayNum = Math.floor(Date.UTC(p[0], p[1] - 1, p[2]) / 86400000);
+		return dayNum % DECK.proverbs.length;
+	}
+
+	// ---------------------------------------------------------------------
+	// Helpers
+	// ---------------------------------------------------------------------
+	function esc(s) {
+		return String(s).replace(/[&<>"']/g, function (c) {
+			return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+		});
+	}
+	function blanks(s) { return esc(s).replace(/_{3,}/g, '<span class="blank">___</span>'); }
+	function shuffle(a) {
+		for (var i = a.length - 1; i > 0; i--) {
+			var j = Math.floor(Math.random() * (i + 1));
+			var t = a[i]; a[i] = a[j]; a[j] = t;
+		}
+		return a;
+	}
+	function pick(a) { return a[Math.floor(Math.random() * a.length)]; }
+	function normalise(s) {
+		return s.toLowerCase().replace(/[?!.,;:"“”'‘’]/g, "").replace(/\s+/g, " ").trim();
+	}
+	function stripMacrons(s) {
+		return s.replace(/ā/g, "a").replace(/ē/g, "e").replace(/ī/g, "i").replace(/ō/g, "o").replace(/ū/g, "u");
+	}
+	function plural(n, one, many) { return n + " " + (n === 1 ? one : many || one + "s"); }
+
+	// ---------------------------------------------------------------------
+	// Session building
+	// ---------------------------------------------------------------------
+	var MAX_REVIEWS = 20;
+
+	function dueCards(topicId) {
+		return CARDS.filter(function (c) { return isDue(c) && (!topicId || c.topic === topicId); })
+			.sort(function (a, b) { return state.cards[a.id].due < state.cards[b.id].due ? -1 : 1; });
+	}
+	function newCards(topicId) {
+		var list = [];
+		var topics = topicId ? [TOPIC_BY_ID[topicId]] : TOPICS;
+		topics.forEach(function (t) {
+			t.cards.forEach(function (c) { if (!state.cards[c.id]) list.push(c); });
+		});
+		return list;
+	}
+	function newAllowance() {
+		return Math.max(0, state.settings.newPerDay - today().newCount);
+	}
+
+	function buildQueue(mode, topicId) {
+		var reviews = [];
+		var fresh = [];
+		if (mode === "practice") {
+			var seen = CARDS.filter(function (c) { return state.cards[c.id] && (!topicId || c.topic === topicId); });
+			// favour cards you get wrong
+			seen.sort(function (a, b) {
+				var sa = state.cards[a.id], sb = state.cards[b.id];
+				return (sb.wrong - sb.right * 0.3) - (sa.wrong - sa.right * 0.3) + (Math.random() - 0.5) * 2;
+			});
+			return shuffle(seen.slice(0, 10)).map(function (c) { return { id: c.id, kind: "practice" }; });
+		}
+		reviews = dueCards(topicId).slice(0, MAX_REVIEWS);
+		var nNew = mode === "more" ? 5 : newAllowance();
+		if (mode === "topic") nNew = Math.max(nNew, 3);
+		fresh = newCards(topicId).slice(0, nNew);
+
+		var q = shuffle(reviews.map(function (c) { return { id: c.id, kind: "review" }; }));
+		// spread new words through the reviews
+		var step = fresh.length ? Math.max(1, Math.floor(q.length / fresh.length)) : 0;
+		fresh.forEach(function (c, i) {
+			var pos = Math.min(q.length, i * (step + 1) + (q.length ? 1 : 0));
+			q.splice(pos, 0, { id: c.id, kind: "intro" });
+		});
+		return q;
+	}
+
+	function pickExercise(card, item) {
+		if (item.kind === "intro") return "intro";
+		if (item.fresh) return "mc_mi";
+		if (item.drill) return "mc_en";
+		var cs = state.cards[card.id] || { reps: 0 };
+		var opts = ["mc_mi", "mc_en"];
+		if (cs.reps >= 1 || item.kind === "practice") opts.push("flash");
+		if ((cs.reps >= 2 || item.kind === "practice") && !card.pattern) opts.push("type", "type");
+		return pick(opts);
+	}
+
+	function distractors(card, field) {
+		var pool = TOPIC_BY_ID[card.topic].cards.filter(function (c) { return c.id !== card.id && c[field] !== card[field] && c.pattern === card.pattern; });
+		if (pool.length < 3) {
+			pool = pool.concat(CARDS.filter(function (c) { return c.topic !== card.topic && c[field] !== card[field] && c.pattern === card.pattern; }));
+		}
+		var out = [];
+		shuffle(pool.slice()).forEach(function (c) {
+			if (out.length < 3 && out.indexOf(c[field]) === -1) out.push(c[field]);
+		});
+		return out;
+	}
+
+	// ---------------------------------------------------------------------
+	// Session state
+	// ---------------------------------------------------------------------
+	var session = null;
+
+	function startSession(mode, topicId) {
+		var q = buildQueue(mode, topicId);
+		if (!q.length) {
+			toast(mode === "topic" ? "Nothing due in this topic — try extra practice." : "All caught up!");
+			return;
+		}
+		session = {
+			mode: mode,
+			topicId: topicId || null,
+			queue: q,
+			pos: 0,
+			total: q.length,
+			done: 0,
+			xp: 0,
+			right: 0,
+			wrong: 0,
+			goalWasMet: today().met,
+			goalJustMet: false,
+			newWords: 0,
+			current: null,
+		};
+		nextItem();
+	}
+
+	function nextItem() {
+		if (session.pos >= session.queue.length) return finishSession();
+		var item = session.queue[session.pos];
+		var card = CARD_BY_ID[item.id];
+		if (!card) { session.pos++; return nextItem(); }
+		var ex = pickExercise(card, item);
+		var cur = { item: item, card: card, ex: ex, answered: false };
+		if (ex === "mc_mi") {
+			cur.options = shuffle([card.en].concat(distractors(card, "en")));
+			cur.answer = card.en;
+		} else if (ex === "mc_en") {
+			cur.options = shuffle([card.mi].concat(distractors(card, "mi")));
+			cur.answer = card.mi;
+		}
+		session.current = cur;
+		render();
+		if (ex === "type") {
+			var input = document.getElementById("type-input");
+			if (input) input.focus();
+		}
+	}
+
+	function award(xp) {
+		session.xp += xp;
+		state.xp += xp;
+		today().xp += xp;
+	}
+
+	// record a graded answer
+	function record(correct, grade, xp) {
+		var cur = session.current;
+		var d = today();
+		if (cur.item.kind !== "practice") schedule(cur.card.id, grade);
+		d.reviews++;
+		state.stats.answers++;
+		if (correct) { d.right++; session.right++; state.stats.right++; }
+		else { d.wrong++; session.wrong++; }
+		award(xp);
+		session.done++;
+
+		if (!correct) {
+			// try again a little later in this lesson
+			var retry = { id: cur.card.id, kind: cur.item.kind === "practice" ? "practice" : "review", retry: true };
+			session.queue.splice(Math.min(session.queue.length, session.pos + 4), 0, retry);
+			session.total++;
+		}
+
+		if (!d.met && d.reviews >= state.settings.goal) {
+			d.met = true;
+			session.goalJustMet = true;
+			award(20);
+			var s = currentStreak();
+			if (s > state.stats.bestStreak) state.stats.bestStreak = s;
+			if (s > 0 && s % 7 === 0 && state.freezeAwardedOn !== todayKey() && state.freezes < 2) {
+				state.freezes++;
+				state.freezeAwardedOn = todayKey();
+				session.earnedFreeze = true;
+			}
+			var pi = proverbIndex(todayKey());
+			if (state.proverbs.indexOf(pi) === -1) state.proverbs.push(pi);
+		}
+		cur.answered = true;
+		cur.correct = correct;
+		save();
+	}
+
+	function finishIntro() {
+		var cur = session.current;
+		var d = today();
+		d.newCount++;
+		session.newWords++;
+		award(5);
+		schedule(cur.card.id, 0); // creates the card state, due today
+		state.cards[cur.card.id].wrong = 0;
+		// quiz it a couple of items later (Māori → English, scheduled), then
+		// drill it once more the other way near the end (practice only, so
+		// the same-day repeat doesn't over-advance the schedule)
+		session.queue.splice(Math.min(session.queue.length, session.pos + 3), 0, { id: cur.card.id, kind: "review", fresh: true });
+		session.queue.push({ id: cur.card.id, kind: "practice", drill: true });
+		session.total += 2;
+		save();
+		advance();
+	}
+
+	function advance() {
+		session.pos++;
+		nextItem();
+	}
+
+	function finishSession() {
+		state.stats.sessions++;
+		if (session.wrong === 0 && session.done >= 10) state.stats.perfect++;
+		var s = currentStreak();
+		if (s > state.stats.bestStreak) state.stats.bestStreak = s;
+		session.newAchievements = checkAchievements();
+		session.finished = true;
+		save();
+		render();
+	}
+
+	function quitSession() {
+		if (session && session.done > 0) {
+			state.stats.sessions++;
+			checkAchievements();
+			save();
+		}
+		session = null;
+		render();
+	}
+
+	// ---------------------------------------------------------------------
+	// UI: navigation
+	// ---------------------------------------------------------------------
+	var view = "home";
+	var topicView = null;
+	var root = document.getElementById("app");
+
+	function toast(msg) {
+		var el = document.createElement("div");
+		el.className = "toast";
+		el.textContent = msg;
+		document.body.appendChild(el);
+		setTimeout(function () { el.classList.add("show"); }, 10);
+		setTimeout(function () { el.classList.remove("show"); setTimeout(function () { el.remove(); }, 300); }, 3200);
+	}
+
+	function render() {
+		if (session) {
+			root.innerHTML = session.finished ? renderSummary() : renderSession();
+			document.body.classList.add("in-session");
+		} else {
+			document.body.classList.remove("in-session");
+			var html = "";
+			if (view === "home") html = renderHome();
+			else if (view === "topics") html = topicView ? renderTopic(topicView) : renderTopics();
+			else if (view === "progress") html = renderProgress();
+			else if (view === "more") html = renderMore();
+			root.innerHTML = html + renderTabs();
+		}
+		window.scrollTo(0, 0);
+	}
+
+	function renderTabs() {
+		var tabs = [
+			["home", "🏠", "Kāinga"],
+			["topics", "🗺️", "Kaupapa"],
+			["progress", "🏆", "Ahunga"],
+			["more", "⚙️", "Ētahi atu"],
+		];
+		return '<nav class="tabs">' + tabs.map(function (t) {
+			return '<button class="tab' + (view === t[0] ? " active" : "") + '" data-action="tab" data-tab="' + t[0] + '"><span class="tab-icon">' + t[1] + '</span><span class="tab-label">' + t[2] + "</span></button>";
+		}).join("") + "</nav>";
+	}
+
+	// ---------------------------------------------------------------------
+	// UI: home
+	// ---------------------------------------------------------------------
+	var DAY_SHORT = ["Hi", "Tū", "Ap", "Pa", "Me", "Ho", "Ta"];
+
+	function ring(pct, label, sub) {
+		var r = 52, c = 2 * Math.PI * r;
+		var off = c * (1 - Math.min(1, pct));
+		return '<svg class="ring" viewBox="0 0 120 120" aria-hidden="true">' +
+			'<circle cx="60" cy="60" r="' + r + '" class="ring-bg"/>' +
+			'<circle cx="60" cy="60" r="' + r + '" class="ring-fg" stroke-dasharray="' + c.toFixed(1) + '" stroke-dashoffset="' + off.toFixed(1) + '"/>' +
+			'<text x="60" y="58" class="ring-label">' + label + "</text>" +
+			'<text x="60" y="78" class="ring-sub">' + sub + "</text></svg>";
+	}
+
+	function weekRow() {
+		var t = todayKey();
+		var start = addDays(t, -dayOfWeek(t));
+		var out = "";
+		for (var i = 0; i < 7; i++) {
+			var k = addDays(start, i);
+			var cls = "day";
+			var mark = "";
+			if (state.days[k] && state.days[k].met) { cls += " met"; mark = "✓"; }
+			else if (state.frozen.indexOf(k) !== -1) { cls += " frozen"; mark = "❄"; }
+			if (k === t) cls += " today";
+			if (k > t) cls += " future";
+			out += '<div class="' + cls + '"><span class="day-dot">' + mark + '</span><span class="day-name">' + DAY_SHORT[i] + "</span></div>";
+		}
+		return '<div class="week">' + out + "</div>";
+	}
+
+	function renderHome() {
+		var d = today();
+		var streak = currentStreak();
+		var lv = levelInfo(state.xp);
+		var due = dueCards().length;
+		var nNew = Math.min(newAllowance(), newCards().length);
+		var c = counts(CARDS);
+		var goal = state.settings.goal;
+		var pi = proverbIndex(todayKey());
+		var prov = DECK.proverbs[pi];
+
+		var html = '<main class="page">';
+		html += '<header class="home-head"><div><h1>Kia ora!</h1><p class="muted">' + greetingLine(d, streak) + "</p></div>" +
+			'<div class="level-chip" title="Level ' + lv.n + '"><span>' + esc(lv.lvl.mi) + "</span><small>" + state.xp + " XP</small></div></header>";
+
+		if (freezeMessage) {
+			html += '<div class="banner">' + esc(freezeMessage) + "</div>";
+			freezeMessage = "";
+		}
+		if (!storageOk) html += '<div class="banner warn">This browser isn\'t saving progress (private mode?). Export a backup from More.</div>';
+
+		html += '<section class="card streak-card">' +
+			'<div class="streak-top"><div class="streak-num' + (streak ? " lit" : "") + '">🔥 <strong>' + streak + "</strong> " + (streak === 1 ? "day" : "days") + "</div>" +
+			'<div class="freezes" title="Streak freezes: earn one every 7 days in a row (max 2)">' + (state.freezes ? "❄️".repeat(state.freezes) : '<span class="muted">no freezes</span>') + "</div></div>" +
+			weekRow() + "</section>";
+
+		html += '<section class="card goal-card">' + ring(d.reviews / goal, Math.min(d.reviews, goal) + "/" + goal, d.met ? "done!" : "today") +
+			'<div class="goal-side">';
+		if (due || nNew) {
+			html += "<h2>" + (d.met ? "Keep going?" : "Today's lesson") + "</h2>" +
+				'<p class="muted">' + plural(due, "review") + " · " + plural(nNew, "new word") + "</p>" +
+				'<button class="btn primary big" data-action="start" data-mode="daily">' + (d.reviews ? "Continue" : "Start") + "</button>";
+		} else {
+			html += "<h2>All caught up 🎉</h2><p class=\"muted\">Nothing due. Want more?</p>" +
+				'<div class="btn-col"><button class="btn primary" data-action="start" data-mode="practice">Extra practice</button>' +
+				(newCards().length ? '<button class="btn" data-action="start" data-mode="more">Learn 5 more words</button>' : "") + "</div>";
+		}
+		html += "</div></section>";
+
+		html += '<section class="card proverb ' + (d.met ? "open" : "locked") + '"><div class="eyebrow">Whakataukī o te rā</div>';
+		if (d.met) {
+			html += '<p class="proverb-mi">' + esc(prov[0]) + '</p><p class="proverb-en">' + esc(prov[1]) + "</p>";
+		} else {
+			html += '<p class="muted">🔒 Reach today\'s goal to reveal the proverb of the day.</p>';
+		}
+		html += "</section>";
+
+		html += '<section class="stat-row">' +
+			stat(c.seen, "introduced") + stat(c.solid, "learned") + stat(c.mastered, "mastered") + "</section>";
+
+		html += "</main>";
+		return html;
+	}
+
+	function greetingLine(d, streak) {
+		if (d.met) return "Goal done for today. Ka pai!";
+		if (streak > 0) return "Keep your " + streak + "-day streak alive.";
+		return "A few minutes a day adds up.";
+	}
+
+	function stat(n, label) {
+		return '<div class="stat"><strong>' + n + "</strong><span>" + label + "</span></div>";
+	}
+
+	// ---------------------------------------------------------------------
+	// UI: topics
+	// ---------------------------------------------------------------------
+	function renderTopics() {
+		var html = '<main class="page"><h1>Kaupapa <span class="muted small">Topics</span></h1>' +
+			'<p class="muted">Your learning path. New words come from the first unfinished topic, or tap a topic to focus on it.</p><div class="path">';
+		TOPICS.forEach(function (t, i) {
+			var c = counts(t.cards);
+			var pct = c.total ? (c.seen + c.solid) / (2 * c.total) : 0;
+			var done = c.solid === c.total;
+			html += '<button class="node' + (done ? " done" : c.seen ? " started" : "") + (i % 2 ? " right" : "") + '" data-action="topic" data-topic="' + t.id + '">' +
+				'<span class="node-ring" style="--p:' + Math.round(pct * 100) + '"><span class="node-icon">' + t.icon + "</span></span>" +
+				'<span class="node-text"><strong>' + esc(t.mi) + "</strong><span>" + esc(t.en) + "</span>" +
+				'<small>' + c.seen + "/" + c.total + " introduced · " + c.solid + " learned</small></span></button>";
+		});
+		html += "</div></main>";
+		return html;
+	}
+
+	function renderTopic(id) {
+		var t = TOPIC_BY_ID[id];
+		var c = counts(t.cards);
+		var due = dueCards(id).length;
+		var fresh = newCards(id).length;
+		var html = '<main class="page"><button class="back" data-action="back">‹ Topics</button>' +
+			'<h1>' + t.icon + " " + esc(t.mi) + ' <span class="muted small">' + esc(t.en) + "</span></h1>" +
+			'<p class="muted">' + c.seen + "/" + c.total + " introduced · " + c.solid + " learned · " + c.mastered + " mastered</p>" +
+			'<div class="btn-row">' +
+			((due || fresh) ? '<button class="btn primary" data-action="start" data-mode="topic" data-topic="' + id + '">Study this topic</button>' : "") +
+			(c.seen ? '<button class="btn" data-action="start" data-mode="practice" data-topic="' + id + '">Practise</button>' : "") +
+			"</div><ul class=\"word-list\">";
+		t.cards.forEach(function (card) {
+			var st = cardStatus(card);
+			html += '<li class="word ' + st + '"><span class="status-dot" title="' + st + '"></span>' +
+				'<div class="word-main"><span class="word-mi">' + (st === "new" ? '<span class="muted">' + blanks(card.mi) + "</span>" : blanks(card.mi)) + "</span>" +
+				'<span class="word-en">' + blanks(card.en) + "</span></div>" +
+				'<a class="teaka" href="' + teAkaUrl(card) + '" target="_blank" rel="noopener" title="Look up in Te Aka">Te Aka ↗</a></li>';
+		});
+		html += '</ul><p class="legend"><span class="status-dot new"></span>new <span class="status-dot learning"></span>learning <span class="status-dot learned"></span>learned <span class="status-dot mastered"></span>mastered</p></main>';
+		return html;
+	}
+
+	// ---------------------------------------------------------------------
+	// UI: progress
+	// ---------------------------------------------------------------------
+	function renderProgress() {
+		var lv = levelInfo(state.xp);
+		var c = counts(CARDS);
+		var acc = state.stats.answers ? Math.round(100 * state.stats.right / state.stats.answers) : 0;
+		var html = '<main class="page"><h1>Ahunga <span class="muted small">Progress</span></h1>';
+		html += '<section class="card level-card"><div class="eyebrow">Level ' + lv.n + "</div><h2>" + esc(lv.lvl.mi) + ' <span class="muted small">' + esc(lv.lvl.en) + "</span></h2>" +
+			'<div class="bar"><span style="width:' + Math.round(lv.pct * 100) + '%"></span></div>' +
+			'<p class="muted small">' + (lv.next ? state.xp + " / " + lv.next.xp + " XP to " + esc(lv.next.mi) + " (" + esc(lv.next.en) + ")" : state.xp + " XP — top level reached. Tino pai!") + "</p></section>";
+		html += '<section class="stat-grid">' +
+			stat(currentStreak(), "day streak") + stat(state.stats.bestStreak, "best streak") +
+			stat(c.solid, "words learned") + stat(c.mastered, "mastered") +
+			stat(state.stats.answers, "answers") + stat(acc + "%", "accuracy") + "</section>";
+
+		html += '<h2 class="section-title">Ngā tohu <span class="muted small">Achievements</span></h2><div class="badges">';
+		ACHIEVEMENTS.forEach(function (a) {
+			var got = state.achievements[a.id];
+			html += '<div class="badge' + (got ? " got" : "") + '"><span class="badge-icon">' + (got ? a.icon : "🔒") + "</span><strong>" + esc(a.mi) + "</strong><span>" + esc(a.en) + "</span></div>";
+		});
+		html += "</div>";
+
+		html += '<h2 class="section-title">Whakataukī collected <span class="muted small">' + state.proverbs.length + "/" + DECK.proverbs.length + "</span></h2>";
+		if (!state.proverbs.length) html += '<p class="muted">Hit your daily goal to collect one each day.</p>';
+		html += '<div class="proverb-list">';
+		state.proverbs.slice().reverse().forEach(function (i) {
+			var p = DECK.proverbs[i];
+			if (p) html += '<div class="card proverb open"><p class="proverb-mi">' + esc(p[0]) + '</p><p class="proverb-en">' + esc(p[1]) + "</p></div>";
+		});
+		html += "</div></main>";
+		return html;
+	}
+
+	// ---------------------------------------------------------------------
+	// UI: more (settings, guide, sources)
+	// ---------------------------------------------------------------------
+	function choice(name, values, current, suffix) {
+		return '<div class="choices">' + values.map(function (v) {
+			return '<button class="chip' + (v === current ? " active" : "") + '" data-action="setting" data-name="' + name + '" data-value="' + v + '">' + v + (suffix || "") + "</button>";
+		}).join("") + "</div>";
+	}
+
+	function renderMore() {
+		var s = state.settings;
+		return '<main class="page"><h1>Ētahi atu <span class="muted small">More</span></h1>' +
+			'<section class="card"><h2>Daily goal</h2><p class="muted small">Answers per day to keep your streak.</p>' + choice("goal", [5, 10, 20, 30], s.goal) +
+			'<h2>New words per day</h2>' + choice("newPerDay", [3, 5, 8, 12], s.newPerDay) + "</section>" +
+
+			'<section class="card"><h2>Pronunciation</h2><table class="pron">' +
+			"<tr><td><b>a</b></td><td>like the u in <i>cut</i>; <b>ā</b> like <i>car</i></td></tr>" +
+			"<tr><td><b>e</b></td><td>like <i>egg</i>; <b>ē</b> held longer</td></tr>" +
+			"<tr><td><b>i</b></td><td>like the ee in <i>eat</i></td></tr>" +
+			"<tr><td><b>o</b></td><td>like <i>or</i>, short; <b>ō</b> held longer</td></tr>" +
+			"<tr><td><b>u</b></td><td>like the oo in <i>zoo</i></td></tr>" +
+			"<tr><td><b>wh</b></td><td>usually like <i>f</i> (varies by region)</td></tr>" +
+			"<tr><td><b>ng</b></td><td>like the ng in <i>singer</i>, also at the start of a word</td></tr>" +
+			"<tr><td><b>r</b></td><td>a soft tap of the tongue, close to the d in <i>ladder</i></td></tr></table>" +
+			'<p class="muted small">Every syllable ends in a vowel: wha-nau, Ao-te-a-ro-a. A macron (ā) means hold the vowel longer — it can change the meaning.</p>' +
+			'<p class="muted small">For audio, tap "Te Aka ↗" on any word to hear it spoken in Te Aka Māori Dictionary.</p></section>' +
+
+			'<section class="card"><h2>Your progress</h2><p class="muted small">Progress is saved only in this browser. Back it up, or move it to another device.</p>' +
+			'<div class="btn-row"><button class="btn" data-action="export">Export backup</button>' +
+			'<label class="btn">Import backup<input type="file" accept="application/json,.json" id="import-file" hidden></label></div>' +
+			'<button class="btn danger" data-action="reset">Reset all progress</button></section>' +
+
+			'<section class="card"><h2>About the words</h2><p class="small">This deck is a hand-curated draft, not machine translation. Each word links to <a href="https://maoridictionary.co.nz" target="_blank" rel="noopener">Te Aka Māori Dictionary</a>, the authority. If something here disagrees with Te Aka, trust Te Aka. Spelling follows <a href="https://www.tetaurawhiri.govt.nz" target="_blank" rel="noopener">Te Taura Whiri i te Reo Māori</a> (Māori Language Commission) conventions.</p>' +
+			'<p class="muted small">' + CARDS.length + " cards · " + TOPICS.length + " topics · " + DECK.proverbs.length + " whakataukī</p></section>" +
+			'<p class="install-hint muted small">Tip: use "Add to Home Screen" in your phone\'s browser menu to install Reo like an app. It works offline.</p>' +
+			"</main>";
+	}
+
+	// ---------------------------------------------------------------------
+	// UI: session
+	// ---------------------------------------------------------------------
+	function sessionHeader() {
+		var pct = session.total ? session.pos / session.total : 0;
+		return '<header class="s-head"><button class="icon-btn" data-action="quit" aria-label="End lesson">✕</button>' +
+			'<div class="bar"><span style="width:' + Math.round(pct * 100) + '%"></span></div>' +
+			'<span class="s-xp">+' + session.xp + " XP</span></header>";
+	}
+
+	function detailBlock(card) {
+		var html = '<div class="detail">';
+		if (card.note) html += '<p class="note">' + esc(card.note) + "</p>";
+		if (card.ex) html += '<p class="ex"><b>' + esc(card.ex) + "</b><br><span class=\"muted\">" + esc(card.exEn) + "</span></p>";
+		html += '<a class="teaka" href="' + teAkaUrl(card) + '" target="_blank" rel="noopener">Look up “' + esc(card.lookup) + '” in Te Aka ↗</a></div>';
+		return html;
+	}
+
+	function renderSession() {
+		var cur = session.current;
+		var card = cur.card;
+		var topic = TOPIC_BY_ID[card.topic];
+		var html = sessionHeader() + '<main class="s-body">';
+		var tag = '<div class="s-tag">' + topic.icon + " " + esc(topic.mi) + (cur.item.retry ? ' · <span class="retry">try again</span>' : "") + "</div>";
+
+		if (cur.ex === "intro") {
+			html += tag + '<div class="s-kicker new-kicker">✨ New word</div>' +
+				'<div class="big-word">' + blanks(card.mi) + "</div>" +
+				'<div class="big-en">' + blanks(card.en) + "</div>" + detailBlock(card) +
+				'<div class="s-foot"><button class="btn primary big" data-action="intro-ok">Got it</button></div>';
+		} else if (cur.ex === "mc_mi" || cur.ex === "mc_en") {
+			var prompt = cur.ex === "mc_mi" ? card.mi : card.en;
+			html += tag + '<div class="s-kicker">' + (cur.ex === "mc_mi" ? "What does this mean?" : "How do you say this in te reo?") + "</div>" +
+				'<div class="big-word' + (cur.ex === "mc_en" ? " en" : "") + '">' + blanks(prompt) + '</div><div class="options">';
+			cur.options.forEach(function (o, i) {
+				var cls = "option";
+				if (cur.answered) {
+					if (o === cur.answer) cls += " correct";
+					else if (o === cur.chosen) cls += " wrong";
+					else cls += " dim";
+				}
+				html += '<button class="' + cls + '" data-action="mc" data-i="' + i + '"' + (cur.answered ? " disabled" : "") + ">" + blanks(o) + "</button>";
+			});
+			html += "</div>";
+			if (cur.answered) html += feedback(cur);
+		} else if (cur.ex === "flash") {
+			html += tag + '<div class="s-kicker">Do you remember?</div>' +
+				'<div class="big-word">' + blanks(card.mi) + "</div>";
+			if (!cur.revealed) {
+				html += '<div class="s-foot"><button class="btn primary big" data-action="reveal">Show answer</button></div>';
+			} else if (!cur.answered) {
+				html += '<div class="big-en">' + blanks(card.en) + "</div>" + detailBlock(card) +
+					'<div class="s-foot"><p class="muted small center">How well did you know it?</p><div class="grades">' +
+					'<button class="grade g0" data-action="grade" data-g="0">Forgot</button>' +
+					'<button class="grade g1" data-action="grade" data-g="1">Hard</button>' +
+					'<button class="grade g2" data-action="grade" data-g="2">Good</button>' +
+					'<button class="grade g3" data-action="grade" data-g="3">Easy</button></div></div>';
+			}
+		} else if (cur.ex === "type") {
+			html += tag + '<div class="s-kicker">Type it in te reo</div>' +
+				'<div class="big-word en">' + blanks(card.en) + "</div>" +
+				'<form class="type-form" data-action="type-submit"><input id="type-input" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" lang="mi" placeholder="Type your answer"' +
+				(cur.answered ? ' disabled value="' + esc(cur.typed) + '"' : "") + ">" +
+				(cur.answered ? "" : '<div class="macrons">' + ["ā", "ē", "ī", "ō", "ū"].map(function (m) { return '<button type="button" class="chip" data-action="macron" data-m="' + m + '">' + m + "</button>"; }).join("") + "</div>" +
+					'<div class="s-foot"><button class="btn primary big" type="submit">Check</button><button type="button" class="btn ghost" data-action="type-skip">I don\'t know</button></div>') +
+				"</form>";
+			if (cur.answered) html += feedback(cur);
+		}
+		html += "</main>";
+		return html;
+	}
+
+	function feedback(cur) {
+		var card = cur.card;
+		var msg;
+		if (cur.correct && cur.macronSlip) msg = "Almost! Watch the macrons:";
+		else if (cur.correct) msg = pick(["Ka pai!", "Tika!", "Tino pai!", "Ka rawe!", "Koia kei a koe!"]);
+		else msg = "Not quite. The answer:";
+		return '<div class="feedback ' + (cur.correct ? (cur.macronSlip ? "almost" : "good") : "bad") + '">' +
+			'<div class="fb-msg">' + msg + "</div>" +
+			'<div class="fb-answer"><b>' + blanks(card.mi) + "</b> — " + blanks(card.en) + "</div>" +
+			detailBlock(card) +
+			'<button class="btn primary big" data-action="next">Continue</button></div>';
+	}
+
+	function renderSummary() {
+		var acc = session.done ? Math.round(100 * session.right / session.done) : 0;
+		var d = today();
+		var html = '<main class="s-body summary">';
+		html += '<div class="celebrate">' + (session.wrong === 0 && session.done >= 10 ? "💎" : session.goalJustMet ? "🎉" : "🌿") + "</div>" +
+			"<h1>" + (session.goalJustMet ? "Daily goal done!" : "Lesson done!") + "</h1>" +
+			'<div class="stat-row">' + stat("+" + session.xp, "XP") + stat(acc + "%", "accuracy") + stat(session.newWords, "new words") + "</div>";
+		if (session.goalJustMet) {
+			html += '<div class="banner">🔥 Streak: ' + plural(currentStreak(), "day") + (session.earnedFreeze ? " · ❄️ You earned a streak freeze!" : "") + "</div>";
+			var p = DECK.proverbs[proverbIndex(todayKey())];
+			html += '<section class="card proverb open reveal"><div class="eyebrow">Whakataukī o te rā — unlocked</div><p class="proverb-mi">' + esc(p[0]) + '</p><p class="proverb-en">' + esc(p[1]) + "</p></section>";
+		} else if (!d.met) {
+			html += '<p class="muted center">' + (state.settings.goal - d.reviews) + " more answers to reach today's goal.</p>";
+		}
+		(session.newAchievements || []).forEach(function (a) {
+			html += '<div class="card achievement-pop"><span class="badge-icon">' + a.icon + "</span><div><div class=\"eyebrow\">Achievement unlocked</div><strong>" + esc(a.mi) + "</strong><br><span class=\"muted\">" + esc(a.en) + "</span></div></div>";
+		});
+		html += '<div class="s-foot"><button class="btn primary big" data-action="done">Done</button></div></main>';
+		return html;
+	}
+
+	// ---------------------------------------------------------------------
+	// Events
+	// ---------------------------------------------------------------------
+	function onMc(i) {
+		var cur = session.current;
+		if (cur.answered) return;
+		cur.chosen = cur.options[i];
+		var correct = cur.chosen === cur.answer;
+		record(correct, correct ? 2 : 0, correct ? 10 : 2);
+		render();
+	}
+
+	function onType(skip) {
+		var cur = session.current;
+		if (cur.answered) return;
+		var input = document.getElementById("type-input");
+		var typed = skip ? "" : (input ? input.value : "");
+		if (!skip && !typed.trim()) { if (input) input.focus(); return; }
+		cur.typed = typed;
+		var t = normalise(typed);
+		var answers = [cur.card.mi].concat(cur.card.alt).map(normalise);
+		var exact = answers.indexOf(t) !== -1;
+		var loose = !exact && answers.map(stripMacrons).indexOf(stripMacrons(t)) !== -1;
+		if (exact) {
+			state.stats.typedPerfect++;
+			record(true, 2, 15);
+		} else if (loose) {
+			cur.macronSlip = true;
+			record(true, 1, 8);
+		} else {
+			record(false, 0, 2);
+		}
+		render();
+	}
+
+	function exportData() {
+		var blob = new Blob([JSON.stringify(state, null, 1)], { type: "application/json" });
+		var a = document.createElement("a");
+		a.href = URL.createObjectURL(blob);
+		a.download = "reo-backup-" + todayKey() + ".json";
+		document.body.appendChild(a);
+		a.click();
+		setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+	}
+
+	function importData(file) {
+		var reader = new FileReader();
+		reader.onload = function () {
+			try {
+				var s = JSON.parse(reader.result);
+				if (!s || typeof s !== "object" || !s.cards || !s.days) throw new Error("bad");
+				if (!confirm("Replace your current progress with this backup?")) return;
+				localStorage.setItem(STORE_KEY, JSON.stringify(s));
+				state = load();
+				toast("Backup restored.");
+				render();
+			} catch (e) {
+				toast("That file isn't a Reo backup.");
+			}
+		};
+		reader.readAsText(file);
+	}
+
+	root.addEventListener("click", function (e) {
+		var el = e.target.closest("[data-action]");
+		if (!el || el.tagName === "FORM") return;
+		var a = el.getAttribute("data-action");
+		switch (a) {
+			case "tab": view = el.getAttribute("data-tab"); topicView = null; render(); break;
+			case "topic": topicView = el.getAttribute("data-topic"); render(); break;
+			case "back": topicView = null; render(); break;
+			case "start": startSession(el.getAttribute("data-mode"), el.getAttribute("data-topic")); break;
+			case "quit": quitSession(); break;
+			case "done": session = null; render(); break;
+			case "intro-ok": finishIntro(); break;
+			case "mc": onMc(+el.getAttribute("data-i")); break;
+			case "reveal": session.current.revealed = true; render(); break;
+			case "grade": {
+				var g = +el.getAttribute("data-g");
+				record(g > 0, g, [2, 5, 10, 10][g]);
+				advance();
+				break;
+			}
+			case "next": advance(); break;
+			case "type-skip": onType(true); break;
+			case "macron": {
+				var input = document.getElementById("type-input");
+				if (input) {
+					var s = input.selectionStart || input.value.length, en = input.selectionEnd || s;
+					input.value = input.value.slice(0, s) + el.getAttribute("data-m") + input.value.slice(en);
+					input.focus();
+					input.setSelectionRange(s + 1, s + 1);
+				}
+				break;
+			}
+			case "setting":
+				state.settings[el.getAttribute("data-name")] = +el.getAttribute("data-value");
+				save();
+				render();
+				break;
+			case "export": exportData(); break;
+			case "reset":
+				if (confirm("Delete ALL progress, streaks and achievements? This can't be undone.") && confirm("Really? Consider exporting a backup first.")) {
+					state = defaultState();
+					save();
+					toast("Progress reset.");
+					render();
+				}
+				break;
+		}
+	});
+
+	root.addEventListener("submit", function (e) {
+		e.preventDefault();
+		onType(false);
+	});
+
+	root.addEventListener("change", function (e) {
+		if (e.target.id === "import-file" && e.target.files[0]) importData(e.target.files[0]);
+	});
+
+	// Enter to continue after answering
+	document.addEventListener("keydown", function (e) {
+		if (!session || session.finished || !session.current) return;
+		var cur = session.current;
+		if (e.key === "Enter" && cur.answered && cur.ex !== "flash") {
+			e.preventDefault();
+			advance();
+		} else if (!cur.answered && (cur.ex === "mc_mi" || cur.ex === "mc_en") && /^[1-4]$/.test(e.key)) {
+			onMc(+e.key - 1);
+		}
+	});
+
+	// Re-check the date when the app comes back to the foreground (phones keep
+	// PWAs alive for days).
+	var lastDay = todayKey();
+	document.addEventListener("visibilitychange", function () {
+		if (document.visibilityState === "visible" && todayKey() !== lastDay) {
+			lastDay = todayKey();
+			reconcileFreezes();
+			if (!session) render();
+		}
+	});
+
+	// ---------------------------------------------------------------------
+	// Boot
+	// ---------------------------------------------------------------------
+	reconcileFreezes();
+	render();
+
+	if ("serviceWorker" in navigator && location.protocol !== "file:") {
+		window.addEventListener("load", function () {
+			navigator.serviceWorker.register("sw.js").catch(function () {});
+		});
+	}
+
+	// test hook
+	window.__reo = { state: function () { return state; }, CARDS: CARDS, schedule: schedule, addDays: addDays, currentStreak: currentStreak };
+})();
