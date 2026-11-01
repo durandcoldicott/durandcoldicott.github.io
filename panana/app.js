@@ -1490,7 +1490,7 @@
 
 			'<section class="card"><h2>About the words</h2><p class="small">This deck is a hand-curated draft, not machine translation. Each word links to <a href="https://maoridictionary.co.nz" target="_blank" rel="noopener">Te Aka Māori Dictionary</a>, the authority. If something here disagrees with Te Aka, trust Te Aka. Spelling follows <a href="https://www.tetaurawhiri.govt.nz" target="_blank" rel="noopener">Te Taura Whiri i te Reo Māori</a> (Māori Language Commission) conventions.</p>' +
 			'<p class="muted small">' + CARDS.length + " cards · " + TOPICS.length + " topics · " + DECK.proverbs.length + " whakataukī</p></section>" +
-			'<p class="install-hint muted small">Tip: use "Add to Home Screen" in your phone\'s browser menu to install Panana like an app. It keeps working offline and syncs when you\'re back online.</p>' +
+			'<p class="install-hint muted small">📲 <a href="/panana/install">How to install Panana on your phone</a> — it then opens like an app, works offline and syncs when you\'re back online.</p>' +
 			"</main>";
 	}
 
@@ -2311,7 +2311,7 @@
 		html += '<div class="admin-row"><div><div class="eyebrow">Invite code</div>' +
 			(c.closed ? '<span class="muted">Sign-ups closed</span>' : c.invite ? '<code class="invite">' + esc(c.invite) + "</code>" : '<span class="muted">None set</span>') + "</div>" +
 			'<button class="btn" data-action="admin-newcode">New code</button></div>' +
-			'<p class="muted small">Friends sign up at durand.nz/panana with this code. If it gets shared too widely, make a new one — the old code stops working, and existing members keep their accounts.</p>' +
+			'<p class="muted small">Friends sign up at durand.nz/panana with this code (install guide: durand.nz/panana/install). If it gets shared too widely, make a new one — the old code stops working, and existing members keep their accounts.</p>' +
 			'<div class="toggle-row"><span>Allow new sign-ups</span><button class="chip' + (c.closed ? "" : " active") + '" data-action="admin-closed">' + (c.closed ? "Closed" : "Open") + "</button></div>" +
 			'<div class="toggle-row"><span>Member limit</span><span class="choices tight">' + [10, 25, 50].map(function (n) {
 				return '<button class="chip' + (c.max === n ? " active" : "") + '" data-action="admin-max" data-max="' + n + '">' + n + "</button>";
