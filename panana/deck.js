@@ -22,6 +22,7 @@ window.REO_DECK = {
 	topics: [
 		{
 			id: "mihi",
+			picQuiz: false, // pictures here illustrate; they don't clearly translate
 			mi: "Ngā Mihi",
 			en: "Greetings",
 			icon: "👋",
@@ -48,6 +49,7 @@ window.REO_DECK = {
 		},
 		{
 			id: "pepeha",
+			picQuiz: false, // pictures here illustrate; they don't clearly translate
 			mi: "Pepeha",
 			en: "Introducing yourself",
 			icon: "⛰️",
@@ -141,6 +143,7 @@ window.REO_DECK = {
 		},
 		{
 			id: "wa",
+			picQuiz: false, // pictures here illustrate; they don't clearly translate
 			mi: "Te Wā",
 			en: "Days & time",
 			icon: "📅",
@@ -236,6 +239,7 @@ window.REO_DECK = {
 		},
 		{
 			id: "korero",
+			picQuiz: false, // pictures here illustrate; they don't clearly translate
 			mi: "Kōrero",
 			en: "Everyday phrases",
 			icon: "💬",
@@ -270,6 +274,7 @@ window.REO_DECK = {
 		// -----------------------------------------------------------------
 		{
 			id: "kare",
+			picQuiz: false, // pictures here illustrate; they don't clearly translate
 			group: "kupu",
 			source: "Tākaro! reference words — Feelings",
 			mi: "Kare-ā-roto",
@@ -546,6 +551,7 @@ window.REO_DECK = {
 		// -----------------------------------------------------------------
 		{
 			id: "tikanga",
+			picQuiz: false, // pictures here illustrate; they don't clearly translate
 			group: "levels",
 			level: 1,
 			mi: "Ngā Tikanga",
@@ -565,6 +571,7 @@ window.REO_DECK = {
 		},
 		{
 			id: "pehea",
+			picQuiz: false, // pictures here illustrate; they don't clearly translate
 			group: "levels",
 			level: 1,
 			mi: "Kei te pēhea koe?",
@@ -663,6 +670,7 @@ window.REO_DECK = {
 		},
 		{
 			id: "mihi2",
+			picQuiz: false, // pictures here illustrate; they don't clearly translate
 			group: "levels",
 			level: 2,
 			mi: "Ngā Mihi me te Paku Mihi",
@@ -717,6 +725,7 @@ window.REO_DECK = {
 		},
 		{
 			id: "tuahua",
+			picQuiz: false, // pictures here illustrate; they don't clearly translate
 			group: "levels",
 			level: 2,
 			mi: "Ngā Kupu Tūāhua",
@@ -780,6 +789,7 @@ window.REO_DECK = {
 		},
 		{
 			id: "whanau3",
+			picQuiz: false, // pictures here illustrate; they don't clearly translate
 			group: "levels",
 			level: 3,
 			mi: "Taku Whānau",
@@ -825,6 +835,7 @@ window.REO_DECK = {
 		},
 		{
 			id: "moku",
+			picQuiz: false, // pictures here illustrate; they don't clearly translate
 			group: "levels",
 			level: 3,
 			mi: "Kōrero Mōku, Mōna",
@@ -857,6 +868,7 @@ window.REO_DECK = {
 		},
 		{
 			id: "tupou",
+			picQuiz: false, // pictures here illustrate; they don't clearly translate
 			group: "levels",
 			level: 3,
 			mi: "Tūpou",
@@ -884,6 +896,7 @@ window.REO_DECK = {
 		},
 		{
 			id: "tohutohu",
+			picQuiz: false, // pictures here illustrate; they don't clearly translate
 			group: "levels",
 			level: 3,
 			mi: "Ngā Tohutohu",
@@ -920,6 +933,23 @@ window.REO_DECK = {
 					ex: "Waiho te pereti ki te tēpu. Hoatu te pene ki a Māmā.", exEn: "Leave the plate on the table. Give the pen to Mum." },
 			],
 		},
+	],
+
+	// Pictures that illustrate a word but don't clearly translate it: shown
+	// when learning and after answering, never as a picture question.
+	unclearPictures: [
+		"whanau-hoa", "whanau-tamāhine",
+		"wahi-kāinga", "wahi-whenua", "wahi-ngahere",
+		"tinana-tinana", "tinana-upoko", "tinana-kanohi", "tinana-puku", "tinana-matimati",
+		"kai-kai", "kai-inu", "kai-huka", "kai-kaimoana",
+		"bits-pātaka-mātao", "bits-kauoro", "bits-hautōtō", "bits-ipu",
+		"orig-huruwhenua", "orig-kamupūtu", "orig-tōhi",
+		"wild-taniwha", "wild-kererū", "wild-pāua", "wild-toetoe", "wild-koru", "wild-hoe",
+		"tuwahi-runga", "tuwahi-raro", "tuwahi-roto", "tuwahi-waho", "tuwahi-mua", "tuwahi-muri", "tuwahi-waenganui",
+		"tuwahi-taha-matau", "tuwahi-taha-mauī",
+		"hua-huarākau", "hua-tēnei", "hua-tēnā", "hua-tērā",
+		"ahua-āhua", "ahua-iti", "ahua-tokohia",
+		"tangata-pākeke", "tangata-rangatahi",
 	],
 
 	// Whakataukī — one is revealed each day once you hit your daily goal.

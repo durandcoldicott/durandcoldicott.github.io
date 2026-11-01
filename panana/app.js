@@ -20,7 +20,7 @@
 	}
 
 	DECK.topics.forEach(function (t) {
-		var topic = { id: t.id, mi: t.mi, en: t.en, icon: t.icon, group: t.group || "path", source: t.source || "", level: t.level || 0, cards: [] };
+		var topic = { id: t.id, mi: t.mi, en: t.en, icon: t.icon, group: t.group || "path", source: t.source || "", level: t.level || 0, picQuiz: t.picQuiz !== false, cards: [] };
 		t.cards.forEach(function (raw) {
 			if (raw && typeof raw === "object" && !Array.isArray(raw) && raw.gen) {
 				var g = { id: t.id + "-gen-" + raw.gen, mi: raw.mi, en: raw.en, alt: [], note: raw.note || "", lookup: "",
@@ -62,7 +62,12 @@
 	// word in the deck uses the same picture — otherwise two answers would fit.
 	var PIC_USES = {};
 	CARDS.forEach(function (c) { if (c.pic) PIC_USES[c.pic] = (PIC_USES[c.pic] || 0) + 1; });
-	CARDS.forEach(function (c) { c.picQuiz = !!c.pic && PIC_USES[c.pic] === 1 && !c.pattern; });
+	// …and only where the picture clearly is the word (not abstract topics, not listed unclear pictures)
+	var UNCLEAR_PICS = {};
+	(DECK.unclearPictures || []).forEach(function (id) { UNCLEAR_PICS[id] = 1; });
+	var TOPIC_PICQ = {};
+	DECK.topics.forEach(function (t) { TOPIC_PICQ[t.id] = t.picQuiz !== false; });
+	CARDS.forEach(function (c) { c.picQuiz = !!c.pic && PIC_USES[c.pic] === 1 && !c.pattern && TOPIC_PICQ[c.topic] && !UNCLEAR_PICS[c.id]; });
 
 	var TOPIC_BY_ID = {};
 	TOPICS.forEach(function (t) { TOPIC_BY_ID[t.id] = t; });
@@ -540,7 +545,7 @@
 
 	// Profile foods / likes: known a-category food or activity things
 	var LIKES = ["kai-panana", "kai-āporo", "orig-tiakarete", "hua-rōpere", "orig-whutupōro", "orig-pukapuka", "bits-kitā", "kai-ika", "kai-kūmara"];
-	function feelings() { return CARDS.filter(function (c) { return c.topic === "kare" && c.picQuiz && known(c.id); }); }
+	function feelings() { return CARDS.filter(function (c) { return c.topic === "kare" && c.pic && known(c.id); }); }
 	var SWATCHES = { "tae-whero": "🟥", "tae-karaka": "🟧", "tae-kōwhai": "🟨", "tae-kākāriki": "🟩", "tae-kikorangi": "🟦",
 		"tta-waiporoporo": "🟪", "tae-parauri": "🟫", "tae-pango": "⬛", "tae-mā": "⬜" };
 	var SWATCH_IDS = Object.keys(SWATCHES);
@@ -664,7 +669,7 @@
 			var fs = feelings(), f = pick(fs);
 			var wrongF = shuffle(fs.filter(function (x) { return x.id !== f.id; })).slice(0, 4).map(function (x) { return "Kei te " + x.mi + " ahau."; });
 			wrongF.push("Kei te ahau " + f.mi + ".", "Kei " + f.mi + " te ahau.");
-			q = { visual: f.pic, ask: "Kei te pēhea koe?", answer: "Kei te " + f.mi + " ahau.", wrong: wrongF, en: "How are you? I am " + firstGloss(f.en) + "." };
+			q = { visual: f.pic, cue: "(" + firstGloss(f.en) + ")", ask: "Kei te pēhea koe?", answer: "Kei te " + f.mi + " ahau.", wrong: wrongF, en: "How are you? I am " + firstGloss(f.en) + "." };
 		} else if (card.gen === "demonstrative") {
 			var thingsD = knownThings(true), td = pick(thingsD), dem = pick(DEMS), plural = Math.random() < 0.4;
 			var w = plural ? dem.pl : dem.w;
