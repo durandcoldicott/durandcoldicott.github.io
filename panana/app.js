@@ -892,6 +892,12 @@
 		});
 		return list;
 	}
+	// Mistakes: a wrong answer marks a card; two right answers clear it.
+	function mistakeCards() {
+		return CARDS.filter(function (c) { var cs = state.cards[c.id]; return cs && cs.miss > 0; })
+			.sort(function (a, b) { return (state.cards[b.id].lastWrong || "") < (state.cards[a.id].lastWrong || "") ? -1 : 1; });
+	}
+
 	function newAllowance() {
 		return Math.max(0, state.settings.newPerDay - today().newCount);
 	}
@@ -899,6 +905,11 @@
 	function buildQueue(mode, topicId) {
 		var reviews = [];
 		var fresh = [];
+		if (mode === "mistakes") {
+			// each mistake comes up twice (spaced apart) so one round can clear it
+			var ms = shuffle(mistakeCards().slice(0, 12));
+			return ms.concat(shuffle(ms.slice())).map(function (c) { return { id: c.id, kind: "practice", mistake: true }; });
+		}
 		if (mode === "practice") {
 			var seen = CARDS.filter(function (c) { return state.cards[c.id] && (!topicId || c.topic === topicId); });
 			// favour cards you get wrong
@@ -959,7 +970,7 @@
 	function startSession(mode, topicId) {
 		var q = buildQueue(mode, topicId);
 		if (!q.length) {
-			toast(mode === "topic" ? "Nothing due in this topic — try extra practice." : "All caught up!");
+			toast(mode === "topic" ? "Nothing due in this topic — try extra practice." : mode === "mistakes" ? "No mistakes to practise. Ka pai!" : "All caught up!");
 			return;
 		}
 		session = {
@@ -1063,6 +1074,11 @@
 		state.stats.answers++;
 		if (correct) { d.right++; session.right++; state.stats.right++; }
 		else { d.wrong++; session.wrong++; }
+		var mcs = state.cards[cur.card.id];
+		if (mcs) {
+			if (!correct) { mcs.miss = 2; mcs.lastWrong = todayKey(); }
+			else if (mcs.miss > 0) { mcs.miss--; if (!mcs.miss) session.cleared = (session.cleared || 0) + 1; }
+		}
 		award(xp);
 		session.done++;
 
@@ -1158,6 +1174,7 @@
 	var root = document.getElementById("app");
 
 	function toast(msg) {
+		document.querySelectorAll(".toast").forEach(function (t) { t.remove(); });
 		var el = document.createElement("div");
 		el.className = "toast";
 		el.textContent = msg;
@@ -1274,6 +1291,11 @@
 		html += "</div></section>";
 
 		html += standing();
+		var mistakes = mistakeCards().length;
+		if (mistakes) {
+			html += '<button class="card standing mistakes-card" data-action="start" data-mode="mistakes"><span class="standing-icon">🎯</span>' +
+				'<span><span class="eyebrow">Practise my mistakes</span><br>' + plural(mistakes, "word or sentence", "words and sentences") + " to fix</span><span class=\"chev\">›</span></button>";
+		}
 
 		html += '<section class="card proverb ' + (d.met ? "open" : "locked") + '"><div class="eyebrow">Whakataukī o te rā</div>';
 		if (d.met) {
@@ -1439,6 +1461,7 @@
 		return '<main class="page"><h1>Ētahi atu <span class="muted small">More</span></h1>' + account +
 			'<section class="card"><div class="toggle-row"><span><b>Sounds</b><br><span class="muted small">Chimes for right answers, goals and achievements' + (navigator.vibrate ? ", plus a little buzz" : "") + '</span></span>' +
 			'<button class="chip' + (s.sound ? " active" : "") + '" data-action="toggle-sound">' + (s.sound ? "On" : "Off") + "</button></div></section>" +
+			renderReminders() +
 			'<section class="card"><h2>Daily goal</h2><p class="muted small">Answers per day to keep your streak.</p>' + choice("goal", [5, 10, 20, 30], s.goal) +
 			'<h2>New words per day</h2>' + choice("newPerDay", [3, 5, 8, 12], s.newPerDay) + "</section>" +
 
@@ -1614,6 +1637,7 @@
 		} else if (!d.met) {
 			html += '<p class="muted center">' + (state.settings.goal - d.reviews) + " more answers to reach today's goal.</p>";
 		}
+		if (session.cleared) html += '<p class="center">🎯 ' + plural(session.cleared, "mistake") + " fixed!</p>";
 		if (!session.goalJustMet && Math.random() < 0.25) {
 			// an occasional whakataukī, just as a tip — not something to learn
 			var tipI = Math.floor(Math.random() * DECK.proverbs.length), tip = DECK.proverbs[tipI];
@@ -1702,6 +1726,7 @@
 				render();
 				if (view === "ropu" || view === "home") refreshBoard();
 				if (view === "more" && user && user.admin) loadAdmin();
+				if (view === "more") loadPush();
 				break;
 			case "board": boardMetric = el.getAttribute("data-metric"); render(true); break;
 			case "toggle-board":
@@ -1711,6 +1736,13 @@
 				render(true);
 				break;
 			case "logout": logout(); break;
+			case "push-toggle": if (pushInfo && pushInfo.subscribed) pushOff(); else pushOn(); break;
+			case "push-streak": pushPrefs({ streak: !pushInfo.streak }); break;
+			case "push-weekly": pushPrefs({ weekly: !pushInfo.weekly }); break;
+			case "push-test":
+				api("POST", "push/test", {}).then(function (r) { toast(r.ok ? "Sent! It should arrive in a moment." : r.data.error || "Couldn't send — try turning reminders off and on."); })
+					.catch(function () { toast("Can't reach the server."); });
+				break;
 			case "toggle-sound":
 				state.settings.sound = !state.settings.sound;
 				save();
@@ -1809,6 +1841,7 @@
 
 	root.addEventListener("change", function (e) {
 		if (e.target.id === "import-file" && e.target.files[0]) importData(e.target.files[0]);
+		if (e.target.id === "remind-time") pushPrefs({ time: e.target.value });
 	});
 
 	// Enter to continue after answering
@@ -1922,7 +1955,9 @@
 		Object.keys(state.days).forEach(function (k) { if (state.days[k].met && k > lm) lm = k; });
 		var la = "";
 		Object.keys(state.days).forEach(function (k) { if (state.days[k].reviews > 0 && k > la) la = k; });
-		return { xp: state.xp, wk: wk, wx: wx, px: px, st: currentStreak(), lm: lm, lr: solidCount(), la: la, h: !!state.settings.hideFromBoard };
+		var td = state.days[t];
+		return { xp: state.xp, wk: wk, wx: wx, px: px, st: currentStreak(), lm: lm, lr: solidCount(), la: la, h: !!state.settings.hideFromBoard,
+			dk: t, dr: td ? td.reviews : 0, g: state.settings.goal };
 	}
 
 	function stripped(s) {
@@ -2023,6 +2058,106 @@
 			toast(r.ok ? "Password reset for " + d.username + "." : r.data.error || "Couldn't reset.");
 			if (r.ok) form.reset();
 		}).catch(function () { toast("Can't reach the server."); });
+	}
+
+	// ---------------------------------------------------------------------
+	// Reminders (push notifications)
+	// ---------------------------------------------------------------------
+	var pushInfo = null;   // server's view: { subscribed, time, streak, weekly }
+	var pushBusy = false;
+	function pushSupported() { return "serviceWorker" in navigator && "PushManager" in window && "Notification" in window; }
+	function isIOS() { return /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1); }
+	function isStandalone() { return (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || navigator.standalone === true; }
+	function b64uToBytes(s) {
+		s = s.replace(/-/g, "+").replace(/_/g, "/");
+		while (s.length % 4) s += "=";
+		var raw = atob(s), out = new Uint8Array(raw.length);
+		for (var i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+		return out;
+	}
+	function myTimeZone() { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || "Pacific/Auckland"; } catch (e) { return "Pacific/Auckland"; } }
+
+	function loadPush() {
+		if (!user || offline) return;
+		api("GET", "push/status").then(function (r) {
+			if (r.ok) { pushInfo = r.data; if (!session && view === "more") render(true); }
+		}).catch(function () {});
+	}
+
+	function pushOn() {
+		if (pushBusy) return;
+		pushBusy = true;
+		render(true);
+		var prefs = { time: (pushInfo && pushInfo.time) || "19:30", streak: pushInfo ? !!pushInfo.streak : false, weekly: pushInfo ? !!pushInfo.weekly : false };
+		// asking permission must start straight from the tap
+		Notification.requestPermission().then(function (perm) {
+			if (perm !== "granted") throw new Error(perm === "denied" ? "blocked" : "dismissed");
+			return Promise.all([navigator.serviceWorker.ready, api("GET", "push/key")]);
+		}).then(function (res) {
+			var reg = res[0], key = res[1].data.publicKey;
+			return reg.pushManager.getSubscription().then(function (sub) {
+				return sub || reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64uToBytes(key) });
+			});
+		}).then(function (sub) {
+			return api("POST", "push/subscribe", Object.assign({ subscription: sub.toJSON(), tz: myTimeZone() }, prefs));
+		}).then(function (r) {
+			if (!r.ok) throw new Error(r.data.error || "server");
+			pushInfo = Object.assign({ subscribed: true }, prefs);
+			toast("🔔 Reminders on. We'll nudge you at " + prettyTime(prefs.time) + ".");
+		}).catch(function (e) {
+			toast(e.message === "blocked" ? "Notifications are blocked for Panana — allow them in your phone's settings." :
+				e.message === "dismissed" ? "No worries — reminders stay off." : "Couldn't turn reminders on on this device.");
+		}).then(function () { pushBusy = false; render(true); });
+	}
+
+	function pushOff() {
+		pushBusy = true;
+		render(true);
+		navigator.serviceWorker.ready.then(function (reg) { return reg.pushManager.getSubscription(); }).then(function (sub) {
+			var endpoint = sub ? sub.endpoint : null;
+			return (sub ? sub.unsubscribe() : Promise.resolve()).then(function () { return api("POST", "push/unsubscribe", endpoint ? { endpoint: endpoint } : {}); });
+		}).catch(function () {}).then(function () {
+			pushInfo = { subscribed: false };
+			pushBusy = false;
+			toast("Reminders off.");
+			render(true);
+		});
+	}
+
+	function pushPrefs(change) {
+		Object.assign(pushInfo, change);
+		render(true);
+		api("POST", "push/prefs", Object.assign({ tz: myTimeZone() }, change)).catch(function () { toast("Can't reach the server."); });
+	}
+
+	function prettyTime(t) {
+		var hm = (t || "19:30").split(":"), h = +hm[0];
+		return ((h + 11) % 12 + 1) + ":" + hm[1] + (h < 12 ? "am" : "pm");
+	}
+
+	function renderReminders() {
+		var html = '<section class="card"><h2>🔔 Reminders</h2>';
+		if (!pushSupported()) {
+			html += isIOS() && !isStandalone()
+				? '<p class="small">To get practice reminders on iPhone, add Panana to your Home Screen first: tap <b>Share</b> → <b>Add to Home Screen</b>, then open Panana from that icon and come back here.</p>'
+				: '<p class="muted small">This browser can\'t show notifications.</p>';
+			return html + "</section>";
+		}
+		if (Notification.permission === "denied") {
+			return html + '<p class="small">Notifications are blocked for Panana. Allow them in your phone\'s settings to turn reminders on.</p></section>';
+		}
+		var on = pushInfo && pushInfo.subscribed;
+		html += '<div class="toggle-row"><span><b>Daily reminder</b><br><span class="muted small">Only if you haven\'t reached your goal yet</span></span>' +
+			'<button class="chip' + (on ? " active" : "") + '" data-action="push-toggle"' + (pushBusy || !pushInfo ? " disabled" : "") + ">" + (pushBusy ? "…" : on ? "On" : "Off") + "</button></div>";
+		if (on) {
+			var opts = "";
+			for (var h = 6; h <= 22; h++) ["00", "30"].forEach(function (m) { var v = String(h).padStart(2, "0") + ":" + m; opts += '<option value="' + v + '"' + (v === pushInfo.time ? " selected" : "") + ">" + prettyTime(v) + "</option>"; });
+			html += '<div class="toggle-row"><span>Remind me at</span><select id="remind-time" class="time-select">' + opts + "</select></div>" +
+				'<div class="toggle-row"><span>Streak at risk <span class="muted small">(9pm)</span></span><button class="chip' + (pushInfo.streak ? " active" : "") + '" data-action="push-streak">' + (pushInfo.streak ? "On" : "Off") + "</button></div>" +
+				'<div class="toggle-row"><span>Weekly league result <span class="muted small">(Mon 9am)</span></span><button class="chip' + (pushInfo.weekly ? " active" : "") + '" data-action="push-weekly">' + (pushInfo.weekly ? "On" : "Off") + "</button></div>" +
+				'<button class="btn" data-action="push-test">Send a test notification</button>';
+		}
+		return html + "</section>";
 	}
 
 	// ---------------------------------------------------------------------
@@ -2273,5 +2408,5 @@
 	}
 
 	// test hook
-	window.__reo = { state: function () { return state; }, lastSound: function () { return sfx.last; }, generate: function (id) { return generate(CARD_BY_ID[id]); }, genAvailable: function (id) { return genAvailable(CARD_BY_ID[id]); }, pickExercise: function (id, item) { return pickExercise(CARD_BY_ID[id], item || { kind: "review" }); }, distractors: function (id, f) { return distractors(CARD_BY_ID[id], f); }, mergeStates: mergeStates, summary: summary, pushNow: pushNow, CARDS: CARDS, schedule: schedule, addDays: addDays, currentStreak: currentStreak };
+	window.__reo = { state: function () { return state; }, mistakes: function () { return mistakeCards().map(function (c) { return c.id; }); }, lastSound: function () { return sfx.last; }, generate: function (id) { return generate(CARD_BY_ID[id]); }, genAvailable: function (id) { return genAvailable(CARD_BY_ID[id]); }, pickExercise: function (id, item) { return pickExercise(CARD_BY_ID[id], item || { kind: "review" }); }, distractors: function (id, f) { return distractors(CARD_BY_ID[id], f); }, mergeStates: mergeStates, summary: summary, pushNow: pushNow, CARDS: CARDS, schedule: schedule, addDays: addDays, currentStreak: currentStreak };
 })();
