@@ -20,7 +20,7 @@
 	}
 
 	DECK.topics.forEach(function (t) {
-		var topic = { id: t.id, mi: t.mi, en: t.en, icon: t.icon, group: t.group || "path", source: t.source || "", cards: [] };
+		var topic = { id: t.id, mi: t.mi, en: t.en, icon: t.icon, group: t.group || "path", source: t.source || "", term: t.term || 0, cards: [] };
 		t.cards.forEach(function (raw) {
 			if (raw && typeof raw === "object" && !Array.isArray(raw) && raw.gen) {
 				var g = { id: t.id + "-gen-" + raw.gen, mi: raw.mi, en: raw.en, alt: [], note: raw.note || "", lookup: "",
@@ -294,6 +294,7 @@
 		{ id: "orig", icon: "🥝", mi: "Kupu Taketake", en: "Know all the Tākaro! Original words", test: function () { return topicKnown("orig"); } },
 		{ id: "wild", icon: "🐋", mi: "Te Taiao", en: "Know all the Tākaro! Into the Wild words", test: function () { return topicKnown("wild"); } },
 		{ id: "rerenga", icon: "💬", mi: "Kaikōrero", en: "Answer 25 sentence questions correctly", test: function () { return (state.stats.sentences || 0) >= 25; } },
+		{ id: "term1", icon: "🎓", mi: "Wāhanga tuatahi", en: "Know every Term 1 revision topic", test: function () { return ["tikanga", "pehea", "hua", "tau1", "ahua"].every(topicKnown); } },
 		{ id: "ahua", icon: "🔷", mi: "Āhua, Tae, Tatau", en: "Know all the course words and patterns for shapes, colours and counting", test: function () { return topicKnown("ahua"); } },
 		{ id: "words25", icon: "📗", mi: "Rua tekau mā rima", en: "25 words learned", test: function () { return solidCount() >= 25; } },
 		{ id: "words100", icon: "📚", mi: "Kotahi rau", en: "100 words learned", test: function () { return solidCount() >= 100; } },
@@ -362,9 +363,12 @@
 	function known(id) { var cs = state.cards[id]; return !!cs && cs.right > 0; }
 
 	var NUM_WORDS = ["", "tahi", "rua", "toru", "whā", "rima", "ono", "whitu", "waru", "iwa", "tekau"];
-	var NUM_EN = ["", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"];
+	var NUM_EN = ["", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
+		"eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen", "twenty"];
 	var NUM_IDS = ["", "tau-tahi", "tau-rua", "tau-toru", "tau-whā", "tau-rima", "tau-ono", "tau-whitu", "tau-waru", "tau-iwa", "tau-tekau"];
-	function knownNumbers() { var out = []; for (var n = 1; n <= 10; n++) if (known(NUM_IDS[n])) out.push(n); return out; }
+	for (var nn = 1; nn <= 9; nn++) { NUM_WORDS[10 + nn] = "tekau mā " + NUM_WORDS[nn]; NUM_IDS[10 + nn] = "tau-tekau-mā-" + NUM_WORDS[nn]; }
+	NUM_WORDS[20] = "rua tekau"; NUM_IDS[20] = "tau-rua-tekau";
+	function knownNumbers() { var out = []; for (var n = 1; n <= 20; n++) if (CARD_BY_ID[NUM_IDS[n]] && known(NUM_IDS[n])) out.push(n); return out; }
 
 	var COLOUR_IDS = ["tae-whero", "tae-karaka", "tae-kōwhai", "tae-kākāriki", "tae-kikorangi", "tta-waiporoporo", "tae-parauri", "tae-pango", "tae-mā", "tae-māwhero"];
 	// [picture, shape card, colour card, shape in English]
@@ -384,8 +388,9 @@
 	})();
 
 	// Words that work in "He ___ tēnei" / "E hia ngā ___": concrete things with a unique picture.
-	var THING_TOPICS = { tinana: 1, kai: 1, wahi: 1, tta: 1, bits: 1, orig: 1, wild: 1, ahua: 1, whanau: 1 };
-	var NOT_THINGS = { "inu": 1, "pakipaki": 1, "hongi": 1, "iti": 1, "āhua": 1, "Aotearoa": 1, "waiporoporo": 1, "mangu": 1, "kōrero": 1 };
+	var THING_TOPICS = { tinana: 1, kai: 1, wahi: 1, tta: 1, bits: 1, orig: 1, wild: 1, ahua: 1, whanau: 1, hua: 1 };
+	var NOT_THINGS = { "inu": 1, "pakipaki": 1, "hongi": 1, "iti": 1, "āhua": 1, "Aotearoa": 1, "waiporoporo": 1, "mangu": 1, "kōrero": 1,
+		"tēnei": 1, "tēnā": 1, "tērā": 1 };
 	function knownThings(noPeople) {
 		return CARDS.filter(function (c) {
 			return THING_TOPICS[c.topic] && c.picQuiz && !c.gen && !NOT_THINGS[c.mi] && c.mi.indexOf("?") === -1 &&
@@ -400,13 +405,21 @@
 		["whanau-tamāhine", "tamāhine", "tamāhine", "daughters"]];
 
 	function firstGloss(en) { return en.split(" / ")[0]; }
+	function feelings() { return CARDS.filter(function (c) { return c.topic === "kare" && c.picQuiz && known(c.id); }); }
+	var SWATCHES = { "tae-whero": "🟥", "tae-karaka": "🟧", "tae-kōwhai": "🟨", "tae-kākāriki": "🟩", "tae-kikorangi": "🟦",
+		"tta-waiporoporo": "🟪", "tae-parauri": "🟫", "tae-pango": "⬛", "tae-mā": "⬜" };
+	var SWATCH_IDS = Object.keys(SWATCHES);
+	var DEMS = [
+		{ w: "tēnei", pl: "ēnei", cue: "👇 here, by me", en: "this", enPl: "these", where: "by me" },
+		{ w: "tēnā", pl: "ēnā", cue: "👉 there, by you", en: "that", enPl: "those", where: "by you" },
+		{ w: "tērā", pl: "ērā", cue: "🔭 over there", en: "that", enPl: "those", where: "over there" }];
 	function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
 	function words(sentence) { return sentence.replace(/[.?!]$/, "").split(" "); }
 
 	// Counting answers follow the course's rule: 1 → Kotahi te …, 2–9 → E/Toko + number ngā …, 10 → Tekau ngā …
 	function countAnswer(n, sg, pl, people) {
 		if (n === 1) return "Kotahi te " + sg + ".";
-		if (n === 10) return "Tekau ngā " + pl + ".";
+		if (n >= 10) return cap(NUM_WORDS[n]) + " ngā " + pl + ".";
 		return (people ? "Toko" + NUM_WORDS[n] : "E " + NUM_WORDS[n]) + " ngā " + pl + ".";
 	}
 
@@ -419,6 +432,11 @@
 				var shapes = COLOUR_SHAPES.some(function (x) { return known(x[1]) && known(x[2]); });
 				return { ok: colours >= 3 && shapes, need: "Learn 3 colours and a shape (porowhita, tapawhā, manawa…) first." };
 			case "eHia": return { ok: nums >= 3 && knownThings(true).length >= 2, need: "Learn 3 numbers and a few objects first." };
+			case "feeling": return { ok: feelings().length >= 3, need: "Learn 3 Kare-ā-roto (feelings) words first." };
+			case "demonstrative": return { ok: knownThings(true).length >= 3, need: "Learn 3 words with pictures (e.g. fruit) first." };
+			case "list": return { ok: knownThings(true).length >= 6, need: "Learn 6 words with pictures (e.g. fruit) first." };
+			case "coloursOf":
+				return { ok: SWATCH_IDS.filter(known).length >= 3 && knownThings(true).length >= 2, need: "Learn 3 colours and 2 objects first." };
 			case "tokohia":
 				var ppl = PEOPLE.filter(function (x) { return known(x[0]); }).length;
 				return { ok: nums >= 3 && ppl >= 2, need: "Learn 3 numbers and 2 people words (Te Whānau) first." };
@@ -474,12 +492,61 @@
 			var ansN = countAnswer(n, sg, pl, people);
 			var wrongN = [];
 			// other numbers…
-			shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9, 10].filter(function (m) { return m !== n; })).slice(0, 3).forEach(function (m) { wrongN.push(countAnswer(m, sg, pl, people)); });
+			var near = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20].filter(function (m) { return m !== n && Math.abs(m - n) <= (n > 10 ? 4 : 9); });
+			shuffle(near).slice(0, 3).forEach(function (m) { wrongN.push(countAnswer(m, sg, pl, people)); });
+			if (n > 10) wrongN.unshift("E " + NUM_WORDS[n] + " ngā " + pl + ".", (people ? "Toko" : "E ") + NUM_WORDS[n - 10] + " ngā " + pl + ".");
 			// …and the classic mix-up: the other counter (E rua for people, Toko- for things)
 			if (n >= 2 && n <= 9) wrongN.unshift(countAnswer(n, sg, pl, !people));
-			var visual = new Array(n + 1).join(pic);
+			var visual = n <= 10 ? new Array(n + 1).join(pic) : pic + pic + pic + " … × " + n;
 			q = { visual: visual, many: true, ask: (people ? "Tokohia" : "E hia") + " ngā " + pl + "?", answer: ansN, wrong: wrongN,
 				en: "How many " + (people ? enNoun : "(" + enNoun + ")") + "? " + (n === 1 ? "There is one." : "There are " + NUM_EN[n] + ".") };
+		}
+		if (card.gen === "feeling") {
+			var fs = feelings(), f = pick(fs);
+			var wrongF = shuffle(fs.filter(function (x) { return x.id !== f.id; })).slice(0, 4).map(function (x) { return "Kei te " + x.mi + " ahau."; });
+			wrongF.push("Kei te ahau " + f.mi + ".", "Kei " + f.mi + " te ahau.");
+			q = { visual: f.pic, ask: "Kei te pēhea koe?", answer: "Kei te " + f.mi + " ahau.", wrong: wrongF, en: "How are you? I am " + firstGloss(f.en) + "." };
+		} else if (card.gen === "demonstrative") {
+			var thingsD = knownThings(true), td = pick(thingsD), dem = pick(DEMS), plural = Math.random() < 0.4;
+			var w = plural ? dem.pl : dem.w;
+			var ansD = "He " + td.mi + " " + w + ".";
+			var wrongD = [];
+			DEMS.forEach(function (d) { var x = plural ? d.pl : d.w; if (x !== w) wrongD.push("He " + td.mi + " " + x + "."); });
+			wrongD.push("He " + td.mi + " " + (plural ? dem.w : dem.pl) + ".");
+			shuffle(thingsD.filter(function (x) { return x.id !== td.id && x.en !== td.en; })).slice(0, 2).forEach(function (x) { wrongD.push("He " + x.mi + " " + w + "."); });
+			q = { visual: plural ? td.pic + td.pic + (Math.random() < 0.5 ? td.pic : "") : td.pic, many: plural, cue: dem.cue + (plural ? " · more than one" : ""),
+				ask: "He aha " + w + "?", answer: ansD, wrong: wrongD,
+				en: "What " + (plural ? "are " + dem.enPl : "is " + dem.en) + " (" + dem.where + ")? " + cap(plural ? dem.enPl + " are: " : dem.en + " is: ") + firstGloss(td.en) + "." };
+		} else if (card.gen === "list") {
+			var pool = shuffle(knownThings(true).filter(function (x, i, arr) { return arr.findIndex(function (y) { return y.en === x.en; }) === i; }));
+			var k = Math.min(pool.length - 3, Math.random() < 0.5 ? 3 : 4), items = pool.slice(0, k);
+			var lastMany = Math.random() < 0.5;
+			var head = items.slice(0, -1).map(function (x) { return "he " + x.mi; });
+			var last = items[k - 1];
+			var build = function (heads, art, lastWord) { var t = heads.join(", ") + " me " + art + " " + lastWord + "."; return cap(t); };
+			var ansL = build(head, lastMany ? "ngā" : "te", last.mi);
+			// wrong options are genuinely wrong: the te/ngā flipped for the last item, or a thing that isn't in the picture
+			var wrongL = [build(head, lastMany ? "te" : "ngā", last.mi)];
+			var others = pool.slice(k);
+			if (others.length) {
+				wrongL.push(build(head, lastMany ? "ngā" : "te", others[0].mi));
+				var swapIdx = Math.floor(Math.random() * (k - 1));
+				wrongL.push(build(head.map(function (h, i) { return i === swapIdx ? "he " + (others[1] || others[0]).mi : h; }), lastMany ? "ngā" : "te", last.mi));
+				if (others[2]) wrongL.push(build(head.map(function (h, i) { return i === (swapIdx + 1) % (k - 1) ? "he " + others[2].mi : h; }), lastMany ? "te" : "ngā", last.mi));
+			}
+			var vis = items.map(function (x, i) { var many = i === k - 1 ? lastMany : Math.random() < 0.4; return '<span class="grp">' + (many ? x.pic + x.pic : x.pic) + "</span>"; }).join("");
+			var enL = items.slice(0, -1).map(function (x) { return firstGloss(x.en); }).join(", ") + " and " + (lastMany ? "the " + firstGloss(last.en) + " (more than one)" : "the " + firstGloss(last.en));
+			q = { visual: vis, many: true, ask: "Name them all", answer: ansL, wrong: wrongL, en: enL + "." };
+		} else if (card.gen === "coloursOf") {
+			var objs = knownThings(true), ob = pick(objs);
+			var cols = shuffle(SWATCH_IDS.filter(known)), c1 = CARD_BY_ID[cols[0]], c2 = CARD_BY_ID[cols[1]];
+			var tail = " ngā tae o te " + ob.mi + ".";
+			var ansM = "He " + c1.mi + ", he " + c2.mi + tail;
+			var spare = shuffle(SWATCH_IDS.filter(function (id) { return id !== cols[0] && id !== cols[1]; })).map(function (id) { return CARD_BY_ID[id].mi; });
+			var wrongM = ["He " + spare[0] + ", he " + c2.mi + tail, "He " + c1.mi + ", he " + spare[1] + tail,
+				"He " + c1.mi + ", he " + c2.mi + " te tae o te " + ob.mi + ".", "He " + c1.mi + " " + c2.mi + tail];
+			q = { visual: ob.pic + "  " + SWATCHES[cols[0]] + SWATCHES[cols[1]], ask: "He aha ngā tae o te " + ob.mi + "?", answer: ansM, wrong: wrongM,
+				en: "What are the colours of the " + firstGloss(ob.en) + "? " + cap(firstGloss(c1.en)) + " and " + firstGloss(c2.en) + "." };
 		}
 		if (!q) return null;
 		q.options = optionSet(q.answer, q.wrong);
@@ -879,9 +946,15 @@
 		var html = '<main class="page"><h1>Kaupapa <span class="muted small">Topics</span></h1>';
 		if (course.length) {
 			html += '<h2 class="section-title first">Akoranga <span class="muted small">Our course · NMIT Te Reo Level 1</span></h2>' +
-				'<p class="muted small">Words and sentence patterns from our course. Sentences unlock as you learn the words they use.</p><div class="path">';
-			course.forEach(function (t, i) { html += topicNode(t, i); });
-			html += "</div>";
+				'<p class="muted small">Revision of what we\'ve been taught, term by term. Sentences unlock as you learn the words they use.</p>';
+			var TERM_NAMES = ["", "Wāhanga tuatahi · Term 1", "Wāhanga tuarua · Term 2", "Wāhanga tuatoru · Term 3", "Wāhanga tuawhā · Term 4"];
+			[1, 2, 3, 4].forEach(function (term) {
+				var ts = course.filter(function (t) { return t.term === term; });
+				if (!ts.length) return;
+				html += '<h3 class="term-title">' + TERM_NAMES[term] + '</h3><div class="path">';
+				ts.forEach(function (t, i) { html += topicNode(t, i); });
+				html += "</div>";
+			});
 		}
 		html += '<h2 class="section-title">Learning path</h2>' +
 			'<p class="muted small">New words come from the first unfinished topic, or tap a topic to focus on it.</p><div class="path">';
@@ -1079,6 +1152,7 @@
 			var q = cur.q;
 			html += tag + '<div class="s-kicker">' + (cur.tiles ? "Build the answer" : "Choose the answer") + "</div>" +
 				'<div class="gen-visual' + (q.many ? " many" : "") + '" aria-hidden="true">' + q.visual + "</div>" +
+				(q.cue ? '<div class="gen-cue">' + esc(q.cue) + "</div>" : "") +
 				'<div class="gen-ask">' + esc(q.ask) + "</div>";
 			if (!cur.tiles) {
 				html += '<div class="options">';

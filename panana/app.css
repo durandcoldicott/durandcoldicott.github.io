@@ -408,3 +408,6 @@ summary { cursor: pointer; color: var(--brand-text); font-weight: 600; padding: 
 .tile.placed { background: var(--brand-soft); }
 .tile:disabled { cursor: default; color: var(--text); }
 .word.locked { opacity: .7; }
+.gen-cue { text-align: center; font-weight: 700; color: var(--brand-text); margin: -4px 0 8px; }
+.term-title { font-size: .95rem; margin: 14px 0 4px; color: var(--brand-text); }
+.gen-visual .grp { display: inline-block; background: var(--surface-2); border-radius: 14px; padding: 2px 8px; margin: 4px; letter-spacing: 0; }
