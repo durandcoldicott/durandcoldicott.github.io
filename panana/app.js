@@ -705,7 +705,7 @@
 				.sort(function (a, b) { return (known(b) ? 1 : 0) - (known(a) ? 1 : 0); });
 			var wrongDs = ["He " + adj.mi + " " + (many ? "te" : "ngā") + " " + noun.mi + ".", "He " + noun.mi + " " + art + " " + adj.mi + "."];
 			otherAdj.slice(0, 3).forEach(function (a) { wrongDs.push("He " + CARD_BY_ID[a].mi + " " + art + " " + noun.mi + "."); });
-			var pic = noun.pic || "❓";
+			var pic = noun.pic || "";
 			q = { visual: many ? pic + pic + (Math.random() < 0.5 ? pic : "") : pic, many: many, cue: firstGloss(adj.en) + (many ? " · more than one" : ""),
 				ask: "Describe " + (many ? "them" : "it") + " in te reo", answer: ansDs, wrong: wrongDs,
 				en: (many ? "The " + firstGloss(noun.en) + " (more than one) are " : "The " + firstGloss(noun.en) + " is ") + firstGloss(adj.en) + "." };
@@ -759,7 +759,7 @@
 			} else {
 				q = { ask: plural ? "Say: my " + g + " (more than one)" : "Say: my " + g, answer: cap(mine + " " + nn.mi), wrong: others.map(function (f) { return cap(f + " " + nn.mi); }) };
 			}
-			var picP = nn.pic || "❓";
+			var picP = nn.pic || "";
 			q.visual = plural ? picP + picP : picP;
 			q.many = plural;
 			q.en = (isO ? "ō-category (" : "ā-category (") + (plural ? "more than one" : "one") + "): " + mine + ".";
