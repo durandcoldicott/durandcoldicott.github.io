@@ -22,6 +22,14 @@
 	DECK.topics.forEach(function (t) {
 		var topic = { id: t.id, mi: t.mi, en: t.en, icon: t.icon, group: t.group || "path", source: t.source || "", cards: [] };
 		t.cards.forEach(function (raw) {
+			if (raw && typeof raw === "object" && !Array.isArray(raw) && raw.gen) {
+				var g = { id: t.id + "-gen-" + raw.gen, mi: raw.mi, en: raw.en, alt: [], note: raw.note || "", lookup: "",
+					ex: raw.ex || "", exEn: raw.exEn || "", pic: "", topic: t.id, pattern: true, gen: raw.gen };
+				CARD_BY_ID[g.id] = g;
+				CARDS.push(g);
+				topic.cards.push(g);
+				return;
+			}
 			if (typeof raw === "string" && raw.charAt(0) === "@") {
 				// shared with an earlier topic: same card, same progress
 				var shared = CARD_BY_ID[raw.slice(1)];
@@ -285,6 +293,8 @@
 		{ id: "bits", icon: "🛋️", mi: "Ngā Taputapu", en: "Know all the Tākaro! Bits + Bobs words", test: function () { return topicKnown("bits"); } },
 		{ id: "orig", icon: "🥝", mi: "Kupu Taketake", en: "Know all the Tākaro! Original words", test: function () { return topicKnown("orig"); } },
 		{ id: "wild", icon: "🐋", mi: "Te Taiao", en: "Know all the Tākaro! Into the Wild words", test: function () { return topicKnown("wild"); } },
+		{ id: "rerenga", icon: "💬", mi: "Kaikōrero", en: "Answer 25 sentence questions correctly", test: function () { return (state.stats.sentences || 0) >= 25; } },
+		{ id: "ahua", icon: "🔷", mi: "Āhua, Tae, Tatau", en: "Know all the course words and patterns for shapes, colours and counting", test: function () { return topicKnown("ahua"); } },
 		{ id: "words25", icon: "📗", mi: "Rua tekau mā rima", en: "25 words learned", test: function () { return solidCount() >= 25; } },
 		{ id: "words100", icon: "📚", mi: "Kotahi rau", en: "100 words learned", test: function () { return solidCount() >= 100; } },
 		{ id: "perfect", icon: "💎", mi: "Tika rawa", en: "A perfect lesson (10+ answers, no mistakes)", test: function () { return state.stats.perfect >= 1; } },
@@ -344,6 +354,140 @@
 	function plural(n, one, many) { return n + " " + (n === 1 ? one : many || one + "s"); }
 
 	// ---------------------------------------------------------------------
+	// Rerenga: sentence patterns. Each review builds a fresh sentence from
+	// words the learner already knows (answered right at least once), so the
+	// sentences grow with their vocabulary. Grammar stays correct because
+	// every frame only swaps words of one kind into a fixed structure.
+	// ---------------------------------------------------------------------
+	function known(id) { var cs = state.cards[id]; return !!cs && cs.right > 0; }
+
+	var NUM_WORDS = ["", "tahi", "rua", "toru", "whā", "rima", "ono", "whitu", "waru", "iwa", "tekau"];
+	var NUM_EN = ["", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"];
+	var NUM_IDS = ["", "tau-tahi", "tau-rua", "tau-toru", "tau-whā", "tau-rima", "tau-ono", "tau-whitu", "tau-waru", "tau-iwa", "tau-tekau"];
+	function knownNumbers() { var out = []; for (var n = 1; n <= 10; n++) if (known(NUM_IDS[n])) out.push(n); return out; }
+
+	var COLOUR_IDS = ["tae-whero", "tae-karaka", "tae-kōwhai", "tae-kākāriki", "tae-kikorangi", "tta-waiporoporo", "tae-parauri", "tae-pango", "tae-mā", "tae-māwhero"];
+	// [picture, shape card, colour card, shape in English]
+	var COLOUR_SHAPES = [];
+	(function () {
+		var circles = ["🔴", "🟠", "🟡", "🟢", "🔵", "🟣", "🟤", "⚫", "⚪"];
+		var squares = ["🟥", "🟧", "🟨", "🟩", "🟦", "🟪", "🟫", "⬛", "⬜"];
+		var hearts = ["❤️", "🧡", "💛", "💚", "💙", "💜", "🤎", "🖤", "🤍"];
+		var cols = COLOUR_IDS.slice(0, 9);
+		cols.forEach(function (c, i) {
+			COLOUR_SHAPES.push([circles[i], "ahua-porowhita", c, "circle"]);
+			COLOUR_SHAPES.push([squares[i], "ahua-tapawhā", c, "square"]);
+			COLOUR_SHAPES.push([hearts[i], "tta-manawa", c, "heart"]);
+		});
+		COLOUR_SHAPES.push(["🔶", "ahua-taimana", "tae-karaka", "diamond"], ["🔷", "ahua-taimana", "tae-kikorangi", "diamond"],
+			["🔺", "tta-tapatoru", "tae-whero", "triangle"], ["⭐", "tta-whetū", "tae-kōwhai", "star"]);
+	})();
+
+	// Words that work in "He ___ tēnei" / "E hia ngā ___": concrete things with a unique picture.
+	var THING_TOPICS = { tinana: 1, kai: 1, wahi: 1, tta: 1, bits: 1, orig: 1, wild: 1, ahua: 1, whanau: 1 };
+	var NOT_THINGS = { "inu": 1, "pakipaki": 1, "hongi": 1, "iti": 1, "āhua": 1, "Aotearoa": 1, "waiporoporo": 1, "mangu": 1, "kōrero": 1 };
+	function knownThings(noPeople) {
+		return CARDS.filter(function (c) {
+			return THING_TOPICS[c.topic] && c.picQuiz && !c.gen && !NOT_THINGS[c.mi] && c.mi.indexOf("?") === -1 &&
+				!(noPeople && c.topic === "whanau") && known(c.id);
+		});
+	}
+	var PEOPLE = [
+		["whanau-tama", "tama", "tama", "boys"], ["whanau-tamaiti", "tamaiti", "tamariki", "children"],
+		["whanau-pēpi", "pēpi", "pēpi", "babies"], ["whanau-kuia", "kuia", "kuia", "elderly women"],
+		["whanau-koroua", "koroua", "koroua", "elderly men"], ["whanau-wahine", "wahine", "wāhine", "women"],
+		["whanau-tāne", "tāne", "tāne", "men"], ["whanau-tangata", "tangata", "tāngata", "people"],
+		["whanau-tamāhine", "tamāhine", "tamāhine", "daughters"]];
+
+	function firstGloss(en) { return en.split(" / ")[0]; }
+	function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+	function words(sentence) { return sentence.replace(/[.?!]$/, "").split(" "); }
+
+	// Counting answers follow the course's rule: 1 → Kotahi te …, 2–9 → E/Toko + number ngā …, 10 → Tekau ngā …
+	function countAnswer(n, sg, pl, people) {
+		if (n === 1) return "Kotahi te " + sg + ".";
+		if (n === 10) return "Tekau ngā " + pl + ".";
+		return (people ? "Toko" + NUM_WORDS[n] : "E " + NUM_WORDS[n]) + " ngā " + pl + ".";
+	}
+
+	function genAvailable(card) {
+		var nums = knownNumbers().length;
+		switch (card.gen) {
+			case "whatIsThis": return { ok: knownThings().length >= 4, need: "Learn 4 words with pictures (e.g. in Kupu) first." };
+			case "colourOfShape":
+				var colours = COLOUR_IDS.filter(known).length;
+				var shapes = COLOUR_SHAPES.some(function (x) { return known(x[1]) && known(x[2]); });
+				return { ok: colours >= 3 && shapes, need: "Learn 3 colours and a shape (porowhita, tapawhā, manawa…) first." };
+			case "eHia": return { ok: nums >= 3 && knownThings(true).length >= 2, need: "Learn 3 numbers and a few objects first." };
+			case "tokohia":
+				var ppl = PEOPLE.filter(function (x) { return known(x[0]); }).length;
+				return { ok: nums >= 3 && ppl >= 2, need: "Learn 3 numbers and 2 people words (Te Whānau) first." };
+		}
+		return { ok: false, need: "" };
+	}
+
+	function optionSet(correct, wrongs) {
+		var opts = [correct];
+		shuffle(wrongs).forEach(function (w) { if (opts.length < 4 && opts.indexOf(w) === -1) opts.push(w); });
+		return shuffle(opts);
+	}
+	function tileSet(correct, wrongs) {
+		var t = words(correct);
+		// one distractor tile, taken from a wrong answer, that isn't in the right sentence
+		var extra = null;
+		shuffle(wrongs.slice()).some(function (w) {
+			return words(w).some(function (x) { if (t.indexOf(x) === -1) { extra = x; return true; } return false; });
+		});
+		return extra ? t.concat([extra]) : t;
+	}
+
+	function generate(card) {
+		if (!genAvailable(card).ok) return null;
+		var q = null;
+		if (card.gen === "whatIsThis") {
+			var things = knownThings(), c = pick(things);
+			var ans = "He " + c.mi + " tēnei.";
+			var wrong = shuffle(things.filter(function (x) { return x.id !== c.id && x.en !== c.en; })).slice(0, 5).map(function (x) { return "He " + x.mi + " tēnei."; });
+			wrong.push("He tēnei " + c.mi + ".");
+			q = { visual: c.pic, ask: "He aha tēnei?", answer: ans, wrong: wrong, en: "What is this? This is: " + firstGloss(c.en) + "." };
+		} else if (card.gen === "colourOfShape") {
+			var combos = COLOUR_SHAPES.filter(function (x) { return known(x[1]) && known(x[2]); });
+			var x = pick(combos), shape = CARD_BY_ID[x[1]], colour = CARD_BY_ID[x[2]];
+			var ansC = "He " + colour.mi + " te tae o te " + shape.mi + ".";
+			var others = shuffle(COLOUR_IDS.filter(function (id) { return id !== x[2]; }))
+				.sort(function (a, b) { return (known(b) ? 1 : 0) - (known(a) ? 1 : 0); }).slice(0, 4)
+				.map(function (id) { return "He " + CARD_BY_ID[id].mi + " te tae o te " + shape.mi + "."; });
+			others.push("He " + shape.mi + " te tae o te " + colour.mi + ".");
+			q = { visual: x[0], ask: "He aha te tae o te " + shape.mi + "?", answer: ansC, wrong: others,
+				en: "What colour is the " + x[3] + "? The " + x[3] + " is " + firstGloss(colour.en) + "." };
+		} else if (card.gen === "eHia" || card.gen === "tokohia") {
+			var people = card.gen === "tokohia";
+			var nums = knownNumbers(), n = pick(nums);
+			var sg, pl, pic, enNoun;
+			if (people) {
+				var who = pick(PEOPLE.filter(function (p) { return known(p[0]); }));
+				sg = who[1]; pl = who[2]; pic = CARD_BY_ID[who[0]].pic; enNoun = who[3];
+			} else {
+				var th = pick(knownThings(true));
+				sg = pl = th.mi; pic = th.pic; enNoun = firstGloss(th.en);
+			}
+			var ansN = countAnswer(n, sg, pl, people);
+			var wrongN = [];
+			// other numbers…
+			shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9, 10].filter(function (m) { return m !== n; })).slice(0, 3).forEach(function (m) { wrongN.push(countAnswer(m, sg, pl, people)); });
+			// …and the classic mix-up: the other counter (E rua for people, Toko- for things)
+			if (n >= 2 && n <= 9) wrongN.unshift(countAnswer(n, sg, pl, !people));
+			var visual = new Array(n + 1).join(pic);
+			q = { visual: visual, many: true, ask: (people ? "Tokohia" : "E hia") + " ngā " + pl + "?", answer: ansN, wrong: wrongN,
+				en: "How many " + (people ? enNoun : "(" + enNoun + ")") + "? " + (n === 1 ? "There is one." : "There are " + NUM_EN[n] + ".") };
+		}
+		if (!q) return null;
+		q.options = optionSet(q.answer, q.wrong);
+		q.tiles = tileSet(q.answer, q.wrong);
+		return q;
+	}
+
+	// ---------------------------------------------------------------------
 	// Session building
 	// ---------------------------------------------------------------------
 	var MAX_REVIEWS = 20;
@@ -356,7 +500,7 @@
 		var list = [];
 		var topics = topicId ? [TOPIC_BY_ID[topicId]] : TOPICS;
 		topics.forEach(function (t) {
-			t.cards.forEach(function (c) { if (!state.cards[c.id]) list.push(c); });
+			t.cards.forEach(function (c) { if (!state.cards[c.id] && (!c.gen || genAvailable(c).ok) && list.indexOf(c) === -1) list.push(c); });
 		});
 		return list;
 	}
@@ -393,6 +537,7 @@
 
 	function pickExercise(card, item) {
 		if (item.kind === "intro") return "intro";
+		if (card.gen) return "gen";
 		if (item.fresh) return "mc_mi";
 		if (item.drill) return "mc_en";
 		var cs = state.cards[card.id] || { reps: 0 };
@@ -406,7 +551,7 @@
 	function distractors(card, field) {
 		// never offer a synonym (same English, e.g. pango/mangu) or a homograph (same
 		// Māori, e.g. karaka = clock / orange) as a wrong answer — both would be right
-		var ok = function (c) { return c.id !== card.id && c.en !== card.en && c.mi !== card.mi && c.pattern === card.pattern; };
+		var ok = function (c) { return c.id !== card.id && !c.gen && c.en !== card.en && c.mi !== card.mi && c.pattern === card.pattern; };
 		var pool = TOPIC_BY_ID[card.topic].cards.filter(ok);
 		if (pool.length < 3) {
 			pool = pool.concat(CARDS.filter(function (c) { return c.topic !== card.topic && ok(c); }));
@@ -460,6 +605,11 @@
 		} else if (ex === "mc_en" || ex === "pic") {
 			cur.options = shuffle([card.mi].concat(distractors(card, "mi")));
 			cur.answer = card.mi;
+		} else if (ex === "gen") {
+			cur.q = generate(card);
+			if (!cur.q) { session.pos++; return nextItem(); } // not enough known words yet
+			cur.tiles = Math.random() < 0.45;
+			if (cur.tiles) { cur.bank = shuffle(cur.q.tiles.slice()); cur.built = []; }
 		}
 		session.current = cur;
 		render();
@@ -725,8 +875,16 @@
 	function renderTopics() {
 		var path = TOPICS.filter(function (t) { return t.group === "path"; });
 		var kupu = TOPICS.filter(function (t) { return t.group === "kupu"; });
-		var html = '<main class="page"><h1>Kaupapa <span class="muted small">Topics</span></h1>' +
-			'<p class="muted">Your learning path. New words come from the first unfinished topic, or tap a topic to focus on it.</p><div class="path">';
+		var course = TOPICS.filter(function (t) { return t.group === "course"; });
+		var html = '<main class="page"><h1>Kaupapa <span class="muted small">Topics</span></h1>';
+		if (course.length) {
+			html += '<h2 class="section-title first">Akoranga <span class="muted small">Our course · NMIT Te Reo Level 1</span></h2>' +
+				'<p class="muted small">Words and sentence patterns from our course. Sentences unlock as you learn the words they use.</p><div class="path">';
+			course.forEach(function (t, i) { html += topicNode(t, i); });
+			html += "</div>";
+		}
+		html += '<h2 class="section-title">Learning path</h2>' +
+			'<p class="muted small">New words come from the first unfinished topic, or tap a topic to focus on it.</p><div class="path">';
 		path.forEach(function (t, i) { html += topicNode(t, i); });
 		html += "</div>";
 		if (kupu.length) {
@@ -755,11 +913,17 @@
 		var hasPics = t.cards.some(function (c) { return c.pic; });
 		t.cards.forEach(function (card) {
 			var st = cardStatus(card);
+			var lock = card.gen ? genAvailable(card) : null;
+			if (lock && !lock.ok && st === "new") {
+				html += '<li class="word locked"><span class="status-dot"></span>' + (hasPics ? '<span class="word-pic">🔒</span>' : "") +
+					'<div class="word-main"><span class="word-mi muted">' + blanks(card.mi) + '</span><span class="word-en">' + esc(lock.need) + "</span></div></li>";
+				return;
+			}
 			html += '<li class="word ' + st + '"><span class="status-dot" title="' + st + '"></span>' +
-				(card.pic ? '<span class="word-pic">' + card.pic + "</span>" : hasPics ? '<span class="word-pic"></span>' : "") +
+				(card.pic ? '<span class="word-pic">' + card.pic + "</span>" : card.gen ? '<span class="word-pic">💬</span>' : hasPics ? '<span class="word-pic"></span>' : "") +
 				'<div class="word-main"><span class="word-mi">' + (st === "new" ? '<span class="muted">' + blanks(card.mi) + "</span>" : blanks(card.mi)) + "</span>" +
 				'<span class="word-en">' + blanks(card.en) + "</span></div>" +
-				'<a class="teaka" href="' + teAkaUrl(card) + '" target="_blank" rel="noopener" title="Look up in Te Aka">Te Aka ↗</a></li>';
+				(card.gen ? "" : '<a class="teaka" href="' + teAkaUrl(card) + '" target="_blank" rel="noopener" title="Look up in Te Aka">Te Aka ↗</a>') + "</li>";
 		});
 		html += '</ul><p class="legend"><span class="status-dot new"></span>new <span class="status-dot learning"></span>learning <span class="status-dot learned"></span>learned <span class="status-dot mastered"></span>mastered</p></main>';
 		return html;
@@ -862,7 +1026,8 @@
 		if (card.pic && !(session && session.current && session.current.ex === "intro")) html += '<div class="pic small-pic" aria-hidden="true">' + card.pic + "</div>";
 		if (card.note) html += '<p class="note">' + esc(card.note) + "</p>";
 		if (card.ex) html += '<p class="ex"><b>' + esc(card.ex) + "</b><br><span class=\"muted\">" + esc(card.exEn) + "</span></p>";
-		html += '<a class="teaka" href="' + teAkaUrl(card) + '" target="_blank" rel="noopener">Look up “' + esc(card.lookup) + '” in Te Aka ↗</a></div>';
+		if (!card.gen) html += '<a class="teaka" href="' + teAkaUrl(card) + '" target="_blank" rel="noopener">Look up “' + esc(card.lookup) + '” in Te Aka ↗</a>';
+		html += "</div>";
 		return html;
 	}
 
@@ -910,6 +1075,31 @@
 					'<button class="grade g2" data-action="grade" data-g="2">Good</button>' +
 					'<button class="grade g3" data-action="grade" data-g="3">Easy</button></div></div>';
 			}
+		} else if (cur.ex === "gen") {
+			var q = cur.q;
+			html += tag + '<div class="s-kicker">' + (cur.tiles ? "Build the answer" : "Choose the answer") + "</div>" +
+				'<div class="gen-visual' + (q.many ? " many" : "") + '" aria-hidden="true">' + q.visual + "</div>" +
+				'<div class="gen-ask">' + esc(q.ask) + "</div>";
+			if (!cur.tiles) {
+				html += '<div class="options">';
+				q.options.forEach(function (o, i) {
+					var cls = "option";
+					if (cur.answered) cls += o === q.answer ? " correct" : o === cur.chosen ? " wrong" : " dim";
+					html += '<button class="' + cls + '" data-action="gmc" data-i="' + i + '"' + (cur.answered ? " disabled" : "") + ">" + esc(o) + "</button>";
+				});
+				html += "</div>";
+			} else {
+				html += '<div class="tile-line' + (cur.answered ? (cur.correct ? " good" : " bad") : "") + '">' +
+					(cur.built.length ? cur.built.map(function (bi, k) {
+						return '<button class="tile placed" data-action="untile" data-k="' + k + '"' + (cur.answered ? " disabled" : "") + ">" + esc(cur.bank[bi]) + "</button>";
+					}).join("") : '<span class="muted small">Tap the words in order</span>') + "</div>" +
+					(cur.answered ? "" : '<div class="tile-bank">' + cur.bank.map(function (w, i) {
+						var used = cur.built.indexOf(i) !== -1;
+						return '<button class="tile' + (used ? " used" : "") + '" data-action="tile" data-i="' + i + '"' + (used ? " disabled" : "") + ">" + esc(w) + "</button>";
+					}).join("") + "</div>");
+				if (!cur.answered) html += '<div class="s-foot"><button class="btn primary big" data-action="tiles-check"' + (cur.built.length ? "" : " disabled") + ">Check</button></div>";
+			}
+			if (cur.answered) html += genFeedback(cur);
 		} else if (cur.ex === "type") {
 			html += tag + '<div class="s-kicker">Type it in te reo</div>' +
 				'<div class="big-word en">' + blanks(card.en) + "</div>" +
@@ -926,6 +1116,17 @@
 
 	// Answer feedback is a panel pinned to the bottom of the screen, so
 	// Continue is always in reach without scrolling.
+	function genFeedback(cur) {
+		var q = cur.q;
+		var msg = cur.correct ? (cur.praise || (cur.praise = pick(["Ka pai!", "Tika!", "Tino pai!", "Ka rawe!"]))) : "Not quite. The answer:";
+		return '<div class="feedback ' + (cur.correct ? "good" : "bad") + '" role="status">' +
+			'<div class="fb-top"><div class="fb-msg">' + msg + "</div></div>" +
+			'<div class="fb-answer"><span><b>' + esc(q.ask) + " " + esc(q.answer) + "</b></span></div>" +
+			'<p class="fb-note">' + esc(q.en) + "</p>" +
+			(cur.correct ? "" : '<p class="fb-note">Pattern: ' + esc(cur.card.mi) + "</p>") +
+			'<button class="btn primary big" data-action="next">Continue</button></div>';
+	}
+
 	function feedback(cur) {
 		var card = cur.card;
 		var msg;
@@ -1077,6 +1278,28 @@
 				break;
 			}
 			case "next": advance(); break;
+			case "gmc": {
+				var gq = session.current;
+				if (gq.answered) break;
+				gq.chosen = gq.q.options[+el.getAttribute("data-i")];
+				var gok = gq.chosen === gq.q.answer;
+				if (gok) state.stats.sentences = (state.stats.sentences || 0) + 1;
+				record(gok, gok ? 2 : 0, gok ? 12 : 2);
+				render(true);
+				break;
+			}
+			case "tile": session.current.built.push(+el.getAttribute("data-i")); render(true); break;
+			case "untile": session.current.built.splice(+el.getAttribute("data-k"), 1); render(true); break;
+			case "tiles-check": {
+				var tq = session.current;
+				if (tq.answered) break;
+				var made = tq.built.map(function (i) { return tq.bank[i]; }).join(" ");
+				var tok = made === words(tq.q.answer).join(" ");
+				if (tok) state.stats.sentences = (state.stats.sentences || 0) + 1;
+				record(tok, tok ? 2 : 0, tok ? 15 : 2);
+				render(true);
+				break;
+			}
 			case "type-skip": onType(true); break;
 			case "macron": {
 				var input = document.getElementById("type-input");
@@ -1578,5 +1801,5 @@
 	}
 
 	// test hook
-	window.__reo = { state: function () { return state; }, pickExercise: function (id, item) { return pickExercise(CARD_BY_ID[id], item || { kind: "review" }); }, distractors: function (id, f) { return distractors(CARD_BY_ID[id], f); }, mergeStates: mergeStates, summary: summary, pushNow: pushNow, CARDS: CARDS, schedule: schedule, addDays: addDays, currentStreak: currentStreak };
+	window.__reo = { state: function () { return state; }, generate: function (id) { return generate(CARD_BY_ID[id]); }, genAvailable: function (id) { return genAvailable(CARD_BY_ID[id]); }, pickExercise: function (id, item) { return pickExercise(CARD_BY_ID[id], item || { kind: "review" }); }, distractors: function (id, f) { return distractors(CARD_BY_ID[id], f); }, mergeStates: mergeStates, summary: summary, pushNow: pushNow, CARDS: CARDS, schedule: schedule, addDays: addDays, currentStreak: currentStreak };
 })();

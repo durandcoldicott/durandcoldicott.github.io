@@ -388,3 +388,23 @@ summary { cursor: pointer; color: var(--brand-text); font-weight: 600; padding: 
 .pic.quiz-pic { font-size: 6rem; text-align: center; margin: 12px 0 20px; }
 
 .app-name { font-size: .8rem; font-weight: 800; letter-spacing: .04em; color: var(--brand-text); text-transform: uppercase; }
+
+/* ---------- sentences (rerenga) ---------- */
+.section-title.first { margin-top: 4px; }
+.gen-visual { font-size: 4.5rem; text-align: center; margin: 8px 0 10px; line-height: 1.15; }
+.gen-visual.many { font-size: 2.6rem; letter-spacing: .08em; overflow-wrap: anywhere; }
+.gen-ask { font-size: 1.5rem; font-weight: 700; margin: 4px 0 16px; }
+.tile-line { min-height: 64px; border-bottom: 2px solid var(--line); display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 8px 0; margin-bottom: 16px; }
+.tile-line.good { border-color: var(--good); }
+.tile-line.bad { border-color: var(--bad); }
+.tile-bank { display: flex; flex-wrap: wrap; gap: 8px; }
+.tile {
+	font: inherit; font-size: 1.1rem; font-weight: 600;
+	padding: 10px 14px; min-height: 46px; border-radius: 12px;
+	border: 2px solid var(--line); background: var(--surface); color: var(--text);
+	box-shadow: 0 2px 0 var(--line); cursor: pointer;
+}
+.tile.used { visibility: hidden; }
+.tile.placed { background: var(--brand-soft); }
+.tile:disabled { cursor: default; color: var(--text); }
+.word.locked { opacity: .7; }

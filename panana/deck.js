@@ -238,7 +238,7 @@ window.REO_DECK = {
 				["He aha tēnei?", "What is this?", { lookup: "he aha" }],
 				["He ___ tēnei", "This is a ___", { lookup: "tēnei" }],
 				["Kei hea te ___?", "Where is the ___?", { lookup: "kei hea" }],
-				["E hia?", "How many?", { lookup: "hia" }],
+				["E hia?", "How many? (things)", { lookup: "hia", note: "Use e hia for things and animals, tokohia for people." }],
 				["E hia ō tau?", "How old are you?", { lookup: "hia" }],
 				["Kei te aha koe?", "What are you doing?", { lookup: "kei te aha" }],
 				["I pēhea tō rā?", "How was your day?", { lookup: "pēhea" }],
@@ -374,7 +374,7 @@ window.REO_DECK = {
 				["pureti", "plate", { pic: "🍽️" }],
 				["kumete", "bowl", { pic: "🥣" }],
 				["kapu", "mug", { pic: "☕" }],
-				["ipu", "container", { pic: "📦" }],
+				["ipu", "container", { pic: "🫙" }],
 				["hama", "hammer", { pic: "🔨" }],
 				["mauhuri", "spanner", { pic: "🔧" }],
 				["tīkera", "electric kettle"],
@@ -527,6 +527,47 @@ window.REO_DECK = {
 				["puāwai kōwhai", "kōwhai flower", { pic: "🌼" }],
 				["taiaha", "staff (weapon)"],
 				["koru", "spiral motif", { pic: "🌀" }],
+			],
+		},
+
+		// -----------------------------------------------------------------
+		// Akoranga: our NMIT Te Reo Māori Level 1 course content, built from
+		// the course's own word lists and sentence patterns (our own examples
+		// are generated from words each learner already knows).
+		// { gen: ... } entries are sentence patterns: after the intro, every
+		// review is a fresh sentence built from your known words.
+		// -----------------------------------------------------------------
+		{
+			id: "ahua",
+			group: "course",
+			source: "NMIT Te Reo Māori Level 1 — Ngā āhua, ngā tae, E hia? / Tokohia?",
+			mi: "Āhua, Tae, Tatau",
+			en: "Shapes, colours & counting",
+			icon: "🔷",
+			cards: [
+				["āhua", "shape", { pic: "💠" }],
+				["porowhita", "circle", { pic: "⭕", note: "The Tākaro! cards use porotaka for circle; both are used." }],
+				["tapawhā", "square / four-sided shape", { pic: "🔳" }],
+				"@tta-tapatoru",
+				"@tta-whetū",
+				["taimana", "diamond", { pic: "🔷" }],
+				["ripeka", "cross", { pic: "➕" }],
+				["pouaka", "box", { pic: "📦" }],
+				["iti", "small", { pic: "🤏" }],
+				"@korero-e-hia",
+				["Tokohia?", "How many? (people)", { pic: "👥", lookup: "tokohia", note: "Use tokohia for people and e hia for things and animals." }],
+				{ gen: "whatIsThis", mi: "He aha tēnei? → He ___ tēnei.", en: "What is this? → This is a ___.",
+					note: "Ask about any object, and answer with He + the word + tēnei.",
+					ex: "He aha tēnei? He porowhita tēnei.", exEn: "What is this? This is a circle." },
+				{ gen: "colourOfShape", mi: "He aha te tae o te ___? → He ___ te tae o te ___.", en: "What colour is the ___? → The ___ is ___.",
+					note: "tae = colour. Put the colour after He, and the shape after te tae o te.",
+					ex: "He aha te tae o te porowhita? He waiporoporo te tae o te porowhita.", exEn: "What colour is the circle? The circle is purple." },
+				{ gen: "eHia", mi: "E hia ngā ___? → E ___ ngā ___.", en: "How many (things)? → There are ___.",
+					note: "For things and animals. 1: Kotahi te … · 2–9: E + number ngā … · 10: Tekau ngā …",
+					ex: "E hia ngā pukapuka? E rua ngā pukapuka.", exEn: "How many books? There are two books." },
+				{ gen: "tokohia", mi: "Tokohia ngā ___? → Toko___ ngā ___.", en: "How many (people)? → There are ___.",
+					note: "For people. 1: Kotahi te … · 2–9: Toko + number ngā … (tokorua, tokotoru…) · 10: Tekau ngā …",
+					ex: "Tokohia ngā tamariki? Tokotoru ngā tamariki.", exEn: "How many children? There are three children." },
 			],
 		},
 	],
