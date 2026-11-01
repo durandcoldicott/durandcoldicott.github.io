@@ -1,13 +1,13 @@
 {
-	"name": "Reo — te reo Māori practice",
-	"short_name": "Reo",
+	"name": "Panana — te reo Māori practice",
+	"short_name": "Panana",
 	"description": "Personal te reo Māori study app with spaced repetition and streaks.",
 	"start_url": "./",
 	"scope": "./",
 	"display": "standalone",
 	"orientation": "portrait",
-	"background_color": "#f6f3ec",
-	"theme_color": "#1f7a5a",
+	"background_color": "#fbf7ea",
+	"theme_color": "#f5c400",
 	"lang": "mi",
 	"icons": [
 		{ "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },

@@ -1,5 +1,6 @@
 /*
- * Reo — a personal te reo Māori study app.
+ * Panana 🍌 — a te reo Māori study app for our class.
+ * (Named for panana, banana: the first word many of us mastered.)
  * Plain JS, no build step. Progress is kept in this browser (localStorage) so
  * it works offline, and synced to your account via /api/reo (worker/reo.js).
  */
@@ -271,6 +272,7 @@
 
 	var ACHIEVEMENTS = [
 		{ id: "first", icon: "🌱", mi: "Te Tīmatanga", en: "Finish your first lesson", test: function () { return state.stats.sessions >= 1; } },
+		{ id: "panana", icon: "🍌", mi: "Panana!", en: "Learn your first word, like the class did with panana", test: function () { return solidCount() >= 1; } },
 		{ id: "streak3", icon: "🔥", mi: "Toru rā", en: "3-day streak", test: function () { return state.stats.bestStreak >= 3; } },
 		{ id: "streak7", icon: "🔥", mi: "Kotahi wiki", en: "7-day streak", test: function () { return state.stats.bestStreak >= 7; } },
 		{ id: "streak30", icon: "🌕", mi: "Kotahi marama", en: "30-day streak", test: function () { return state.stats.bestStreak >= 30; } },
@@ -649,7 +651,7 @@
 		var prov = DECK.proverbs[pi];
 
 		var html = '<main class="page">';
-		html += '<header class="home-head"><div><h1>Kia ora!</h1><p class="muted">' + greetingLine(d, streak) + "</p></div>" +
+		html += '<header class="home-head"><div><div class="app-name">Panana 🍌</div><h1>Kia ora!</h1><p class="muted">' + greetingLine(d, streak) + "</p></div>" +
 			'<div class="level-chip" title="Level ' + lv.n + '"><span>' + esc(lv.lvl.mi) + "</span><small>" + state.xp + " XP</small></div></header>";
 
 		if (freezeMessage) {
@@ -838,7 +840,7 @@
 
 			'<section class="card"><h2>About the words</h2><p class="small">This deck is a hand-curated draft, not machine translation. Each word links to <a href="https://maoridictionary.co.nz" target="_blank" rel="noopener">Te Aka Māori Dictionary</a>, the authority. If something here disagrees with Te Aka, trust Te Aka. Spelling follows <a href="https://www.tetaurawhiri.govt.nz" target="_blank" rel="noopener">Te Taura Whiri i te Reo Māori</a> (Māori Language Commission) conventions.</p>' +
 			'<p class="muted small">' + CARDS.length + " cards · " + TOPICS.length + " topics · " + DECK.proverbs.length + " whakataukī</p></section>" +
-			'<p class="install-hint muted small">Tip: use "Add to Home Screen" in your phone\'s browser menu to install Reo like an app. It keeps working offline and syncs when you\'re back online.</p>' +
+			'<p class="install-hint muted small">Tip: use "Add to Home Screen" in your phone\'s browser menu to install Panana like an app. It keeps working offline and syncs when you\'re back online.</p>' +
 			"</main>";
 	}
 
@@ -992,7 +994,7 @@
 		var blob = new Blob([JSON.stringify(state, null, 1)], { type: "application/json" });
 		var a = document.createElement("a");
 		a.href = URL.createObjectURL(blob);
-		a.download = "reo-backup-" + todayKey() + ".json";
+		a.download = "panana-backup-" + todayKey() + ".json";
 		document.body.appendChild(a);
 		a.click();
 		setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
@@ -1012,7 +1014,7 @@
 				toast("Backup restored.");
 				render();
 			} catch (e) {
-				toast("That file isn't a Reo backup.");
+				toast("That file isn't a Panana backup.");
 			}
 		};
 		reader.readAsText(file);
@@ -1168,7 +1170,7 @@
 		}
 		return fetch(API + path, opts).then(function (r) {
 			return r.json().catch(function () { return {}; }).then(function (data) {
-				if (r.status === 401) { location.href = "/reo/login"; throw new AuthError(); }
+				if (r.status === 401) { location.href = "/panana/login"; throw new AuthError(); }
 				return { status: r.status, ok: r.ok, data: data };
 			});
 		});
@@ -1295,7 +1297,7 @@
 					localStorage.removeItem(STORE_KEY);
 					localStorage.removeItem("reo.lastUser");
 				} catch (e) {}
-				location.href = "/reo/login";
+				location.href = "/panana/login";
 			});
 		};
 		if (dirty) push().then(go); else go();
@@ -1376,7 +1378,7 @@
 		html += '<div class="admin-row"><div><div class="eyebrow">Invite code</div>' +
 			(c.closed ? '<span class="muted">Sign-ups closed</span>' : c.invite ? '<code class="invite">' + esc(c.invite) + "</code>" : '<span class="muted">None set</span>') + "</div>" +
 			'<button class="btn" data-action="admin-newcode">New code</button></div>' +
-			'<p class="muted small">Friends sign up at durand.nz/reo with this code. If it gets shared too widely, make a new one — the old code stops working, and existing members keep their accounts.</p>' +
+			'<p class="muted small">Friends sign up at durand.nz/panana with this code. If it gets shared too widely, make a new one — the old code stops working, and existing members keep their accounts.</p>' +
 			'<div class="toggle-row"><span>Allow new sign-ups</span><button class="chip' + (c.closed ? "" : " active") + '" data-action="admin-closed">' + (c.closed ? "Closed" : "Open") + "</button></div>" +
 			'<div class="toggle-row"><span>Member limit</span><span class="choices tight">' + [10, 25, 50].map(function (n) {
 				return '<button class="chip' + (c.max === n ? " active" : "") + '" data-action="admin-max" data-max="' + n + '">' + n + "</button>";
@@ -1508,7 +1510,7 @@
 					'<span class="score"><strong>' + r[boardMetric] + "</strong><small>" + units[boardMetric] + "</small></span></li>";
 			});
 			html += "</ol>";
-			if (rows.length < 2) html += '<p class="muted">It\'s just you so far. Share the invite code and durand.nz/reo with friends to get a league going.</p>';
+			if (rows.length < 2) html += '<p class="muted">It\'s just you so far. Share the invite code and durand.nz/panana with friends to get a league going.</p>';
 			if (boardMetric === "week") {
 				var left = 7 - dayOfWeek(todayKey());
 				html += '<p class="muted small center">The weekly league resets on Monday · ' + (left === 1 ? "last day!" : left + " days left") + "</p>";
@@ -1552,7 +1554,7 @@
 			refreshBoard(true);
 		}).catch(function (e) {
 			if (e instanceof AuthError) return;
-			root.innerHTML = '<main class="page"><h1>Reo</h1><p>You\'re offline and haven\'t signed in on this device yet. Connect to the internet and try again.</p></main>';
+			root.innerHTML = '<main class="page"><h1>Panana</h1><p>You\'re offline and haven\'t signed in on this device yet. Connect to the internet and try again.</p></main>';
 		});
 	}
 

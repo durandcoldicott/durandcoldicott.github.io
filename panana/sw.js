@@ -1,9 +1,9 @@
 /*
- * Offline support for Reo. Serves the app from cache first, then refreshes
+ * Offline support for Panana. Serves the app from cache first, then refreshes
  * the cache in the background, so updates appear on the next launch.
  * Bump VERSION when the file list changes.
  */
-var VERSION = "reo-v8";
+var VERSION = "panana-v1";
 var FILES = [
 	"./",
 	"index.html",
@@ -31,7 +31,7 @@ self.addEventListener("install", function (e) {
 self.addEventListener("activate", function (e) {
 	e.waitUntil(
 		caches.keys().then(function (keys) {
-			return Promise.all(keys.filter(function (k) { return k.indexOf("reo-") === 0 && k !== VERSION; }).map(function (k) { return caches.delete(k); }));
+			return Promise.all(keys.filter(function (k) { return k.indexOf("panana-") === 0 && k !== VERSION; }).map(function (k) { return caches.delete(k); }));
 		}).then(function () { return self.clients.claim(); })
 	);
 });
@@ -41,7 +41,7 @@ self.addEventListener("fetch", function (e) {
 	var url = new URL(req.url);
 	if (req.method !== "GET" || url.origin !== self.location.origin) return;
 	// Never cache the API (sign-in state, progress, leaderboard) or the login page.
-	if (url.pathname.indexOf("/api/") === 0 || url.pathname.indexOf("/reo/login") === 0) return;
+	if (url.pathname.indexOf("/api/") === 0 || url.pathname.indexOf("/panana/login") === 0) return;
 	e.respondWith(
 		caches.open(VERSION).then(function (cache) {
 			return cache.match(req, { ignoreSearch: true }).then(function (hit) {

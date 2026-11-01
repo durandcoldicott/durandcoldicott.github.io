@@ -1,5 +1,5 @@
 /*
- * Backend for /reo (the te reo Māori study app): accounts, login sessions,
+ * Backend for /panana (Panana, the te reo Māori study app): accounts, login sessions,
  * per-user progress sync and the group leaderboard.
  *
  * Storage: Cloudflare KV. Uses a REO_KV binding if one exists, otherwise the
@@ -27,14 +27,28 @@ const MAX_FAILS = 10;
 const MAX_STATE_BYTES = 600000;
 const DEFAULT_MAX_MEMBERS = 25;
 
-// Files under /reo/ that load without signing in (the login page and its assets).
+// Served at the old /reo/sw.js (see handlePanana).
+const RETIRE_OLD_SW = `
+self.addEventListener("install", function () { self.skipWaiting(); });
+self.addEventListener("activate", function (e) {
+	e.waitUntil(
+		caches.keys()
+			.then(function (keys) { return Promise.all(keys.filter(function (k) { return k.indexOf("reo-") === 0; }).map(function (k) { return caches.delete(k); })); })
+			.then(function () { return self.registration.unregister(); })
+			.then(function () { return self.clients.matchAll({ type: "window" }); })
+			.then(function (clients) { clients.forEach(function (c) { c.navigate("/panana/"); }); })
+	);
+});
+`;
+
+// Files under /panana/ that load without signing in (the login page and its assets).
 const PUBLIC_PAGES = new Set([
-	"/reo/login",
-	"/reo/login.html",
-	"/reo/login.js",
-	"/reo/app.css",
-	"/reo/manifest.webmanifest",
-	"/reo/sw.js",
+	"/panana/login",
+	"/panana/login.html",
+	"/panana/login.js",
+	"/panana/app.css",
+	"/panana/manifest.webmanifest",
+	"/panana/sw.js",
 ]);
 
 function kvOf(env) {
@@ -416,10 +430,10 @@ async function handleApi(request, env, path) {
 
 // ---------------------------------------------------------------------------
 // Entry point: returns a Response for /reo and /api/reo requests, else null.
-// /reo/* only reaches the Worker because wrangler.toml lists it under
+// /panana/* only reaches the Worker because wrangler.toml lists it under
 // assets.run_worker_first — otherwise static files would bypass this check.
 // ---------------------------------------------------------------------------
-export async function handleReo(request, env, url) {
+export async function handlePanana(request, env, url) {
 	const path = url.pathname;
 
 	if (path.startsWith("/api/reo/")) {
@@ -427,13 +441,23 @@ export async function handleReo(request, env, url) {
 		return handleApi(request, env, path.slice("/api/reo/".length));
 	}
 
+	// The app used to live at /reo. Old installs have a service worker there
+	// serving a cached copy, so /reo/sw.js becomes a clean-up worker that
+	// clears that cache, unregisters itself and moves the app to /panana/.
+	if (path === "/reo/sw.js") {
+		return new Response(RETIRE_OLD_SW, { headers: { "Content-Type": "text/javascript", "Cache-Control": "no-store" } });
+	}
 	if (path === "/reo" || path.startsWith("/reo/")) {
-		if (PUBLIC_PAGES.has(path) || path.startsWith("/reo/icons/")) return env.ASSETS.fetch(request);
+		return new Response(null, { status: 301, headers: { Location: "/panana" + path.slice(4) + url.search } });
+	}
+
+	if (path === "/panana" || path.startsWith("/panana/")) {
+		if (PUBLIC_PAGES.has(path) || path.startsWith("/panana/icons/")) return env.ASSETS.fetch(request);
 		const session = kvOf(env) ? await getSession(request, env) : null;
 		if (session) return env.ASSETS.fetch(request);
 		const accept = request.headers.get("Accept") || "";
 		if (request.method === "GET" && accept.includes("text/html")) {
-			return new Response(null, { status: 302, headers: { Location: "/reo/login", "Cache-Control": "no-store" } });
+			return new Response(null, { status: 302, headers: { Location: "/panana/login", "Cache-Control": "no-store" } });
 		}
 		return new Response("Not signed in", { status: 401, headers: { "Cache-Control": "no-store" } });
 	}

@@ -1,5 +1,5 @@
 /*
- * Starter deck for Reo — a personal te reo Māori study app.
+ * Deck for Panana — a te reo Māori study app.
  *
  * IMPORTANT: this is a hand-curated DRAFT. Every card links to its entry in
  * Te Aka Māori Dictionary (maoridictionary.co.nz), which is the authority.
@@ -188,6 +188,7 @@ window.REO_DECK = {
 			en: "Food & drink",
 			icon: "🍠",
 			cards: [
+				["panana", "banana", { pic: "🍌", note: "Borrowed from English. The first word many of our class mastered — hence the app's name! 🍌" }],
 				["kai", "food / to eat", { pic: "🥘" }],
 				["wai", "water", { pic: "💧" }],
 				["inu", "to drink", { pic: "🧃" }],
