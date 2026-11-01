@@ -1,5 +1,6 @@
 /*
- * Reo — a personal te reo Māori study app.
+ * Panana 🍌 — a te reo Māori study app for our class.
+ * (Named for panana, banana: the first word many of us mastered.)
  * Plain JS, no build step. Progress is kept in this browser (localStorage) so
  * it works offline, and synced to your account via /api/reo (worker/reo.js).
  */
@@ -19,8 +20,15 @@
 	}
 
 	DECK.topics.forEach(function (t) {
-		var topic = { id: t.id, mi: t.mi, en: t.en, icon: t.icon, cards: [] };
+		var topic = { id: t.id, mi: t.mi, en: t.en, icon: t.icon, group: t.group || "path", source: t.source || "", cards: [] };
 		t.cards.forEach(function (raw) {
+			if (typeof raw === "string" && raw.charAt(0) === "@") {
+				// shared with an earlier topic: same card, same progress
+				var shared = CARD_BY_ID[raw.slice(1)];
+				if (!shared) throw new Error("Unknown shared card " + raw);
+				topic.cards.push(shared);
+				return;
+			}
 			var extra = raw[2] || {};
 			var card = {
 				id: t.id + "-" + slug(raw[0]),
@@ -31,6 +39,7 @@
 				lookup: extra.lookup || raw[0].replace(/_+/g, "").replace(/[?!.,]/g, "").replace(/\s+/g, " ").trim(),
 				ex: extra.ex || "",
 				exEn: extra.exEn || "",
+				pic: extra.pic || "",
 				topic: t.id,
 				pattern: raw[0].indexOf("___") !== -1,
 			};
@@ -41,6 +50,12 @@
 		});
 		TOPICS.push(topic);
 	});
+	// A picture can be a question ("What's this in te reo?") only if no other
+	// word in the deck uses the same picture — otherwise two answers would fit.
+	var PIC_USES = {};
+	CARDS.forEach(function (c) { if (c.pic) PIC_USES[c.pic] = (PIC_USES[c.pic] || 0) + 1; });
+	CARDS.forEach(function (c) { c.picQuiz = !!c.pic && PIC_USES[c.pic] === 1 && !c.pattern; });
+
 	var TOPIC_BY_ID = {};
 	TOPICS.forEach(function (t) { TOPIC_BY_ID[t.id] = t; });
 
@@ -257,6 +272,7 @@
 
 	var ACHIEVEMENTS = [
 		{ id: "first", icon: "🌱", mi: "Te Tīmatanga", en: "Finish your first lesson", test: function () { return state.stats.sessions >= 1; } },
+		{ id: "panana", icon: "🍌", mi: "Panana!", en: "Learn your first word, like the class did with panana", test: function () { return solidCount() >= 1; } },
 		{ id: "streak3", icon: "🔥", mi: "Toru rā", en: "3-day streak", test: function () { return state.stats.bestStreak >= 3; } },
 		{ id: "streak7", icon: "🔥", mi: "Kotahi wiki", en: "7-day streak", test: function () { return state.stats.bestStreak >= 7; } },
 		{ id: "streak30", icon: "🌕", mi: "Kotahi marama", en: "30-day streak", test: function () { return state.stats.bestStreak >= 30; } },
@@ -264,6 +280,11 @@
 		{ id: "pepeha", icon: "⛰️", mi: "Taku pepeha", en: "Know all the pepeha patterns — now write yours", test: function () { return topicKnown("pepeha"); } },
 		{ id: "count", icon: "🔢", mi: "Tatau", en: "Know all the numbers", test: function () { return topicKnown("tau"); } },
 		{ id: "days", icon: "📅", mi: "Ngā rā", en: "Know all the days and time words", test: function () { return topicKnown("wa"); } },
+		{ id: "kare", icon: "😊", mi: "Kare-ā-roto", en: "Know all the Tākaro! feelings words", test: function () { return topicKnown("kare"); } },
+		{ id: "tta", icon: "🔺", mi: "Tau, Tae, Āhua", en: "Know all the Tākaro! numbers, colours and shapes", test: function () { return topicKnown("tta"); } },
+		{ id: "bits", icon: "🛋️", mi: "Ngā Taputapu", en: "Know all the Tākaro! Bits + Bobs words", test: function () { return topicKnown("bits"); } },
+		{ id: "orig", icon: "🥝", mi: "Kupu Taketake", en: "Know all the Tākaro! Original words", test: function () { return topicKnown("orig"); } },
+		{ id: "wild", icon: "🐋", mi: "Te Taiao", en: "Know all the Tākaro! Into the Wild words", test: function () { return topicKnown("wild"); } },
 		{ id: "words25", icon: "📗", mi: "Rua tekau mā rima", en: "25 words learned", test: function () { return solidCount() >= 25; } },
 		{ id: "words100", icon: "📚", mi: "Kotahi rau", en: "100 words learned", test: function () { return solidCount() >= 100; } },
 		{ id: "perfect", icon: "💎", mi: "Tika rawa", en: "A perfect lesson (10+ answers, no mistakes)", test: function () { return state.stats.perfect >= 1; } },
@@ -376,15 +397,19 @@
 		if (item.drill) return "mc_en";
 		var cs = state.cards[card.id] || { reps: 0 };
 		var opts = ["mc_mi", "mc_en"];
+		if (card.picQuiz) opts.push("pic", "pic");
 		if (cs.reps >= 1 || item.kind === "practice") opts.push("flash");
 		if ((cs.reps >= 2 || item.kind === "practice") && !card.pattern) opts.push("type", "type");
 		return pick(opts);
 	}
 
 	function distractors(card, field) {
-		var pool = TOPIC_BY_ID[card.topic].cards.filter(function (c) { return c.id !== card.id && c[field] !== card[field] && c.pattern === card.pattern; });
+		// never offer a synonym (same English, e.g. pango/mangu) or a homograph (same
+		// Māori, e.g. karaka = clock / orange) as a wrong answer — both would be right
+		var ok = function (c) { return c.id !== card.id && c.en !== card.en && c.mi !== card.mi && c.pattern === card.pattern; };
+		var pool = TOPIC_BY_ID[card.topic].cards.filter(ok);
 		if (pool.length < 3) {
-			pool = pool.concat(CARDS.filter(function (c) { return c.topic !== card.topic && c[field] !== card[field] && c.pattern === card.pattern; }));
+			pool = pool.concat(CARDS.filter(function (c) { return c.topic !== card.topic && ok(c); }));
 		}
 		var out = [];
 		shuffle(pool.slice()).forEach(function (c) {
@@ -432,7 +457,7 @@
 		if (ex === "mc_mi") {
 			cur.options = shuffle([card.en].concat(distractors(card, "en")));
 			cur.answer = card.en;
-		} else if (ex === "mc_en") {
+		} else if (ex === "mc_en" || ex === "pic") {
 			cur.options = shuffle([card.mi].concat(distractors(card, "mi")));
 			cur.answer = card.mi;
 		}
@@ -583,7 +608,9 @@
 	// ---------------------------------------------------------------------
 	// UI: home
 	// ---------------------------------------------------------------------
-	var DAY_SHORT = ["Hi", "Tū", "Ap", "Pa", "Me", "Ho", "Ta"];
+	// Full Māori day names, Monday first (the deck teaches these in Te Wā).
+	var DAY_NAMES = ["Rāhina", "Rātū", "Rāapa", "Rāpare", "Rāmere", "Rāhoroi", "Rātapu"];
+	var DAY_EN = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
 	function ring(pct, label, sub) {
 		var r = 52, c = 2 * Math.PI * r;
@@ -607,7 +634,7 @@
 			else if (state.frozen.indexOf(k) !== -1) { cls += " frozen"; mark = "❄"; }
 			if (k === t) cls += " today";
 			if (k > t) cls += " future";
-			out += '<div class="' + cls + '"><span class="day-dot">' + mark + '</span><span class="day-name">' + DAY_SHORT[i] + "</span></div>";
+			out += '<div class="' + cls + '" title="' + DAY_NAMES[i] + " — " + DAY_EN[i] + '"><span class="day-dot">' + mark + '</span><span class="day-name">' + DAY_NAMES[i] + "</span></div>";
 		}
 		return '<div class="week">' + out + "</div>";
 	}
@@ -624,7 +651,7 @@
 		var prov = DECK.proverbs[pi];
 
 		var html = '<main class="page">';
-		html += '<header class="home-head"><div><h1>Kia ora!</h1><p class="muted">' + greetingLine(d, streak) + "</p></div>" +
+		html += '<header class="home-head"><div><div class="app-name">Panana 🍌</div><h1>Kia ora!</h1><p class="muted">' + greetingLine(d, streak) + "</p></div>" +
 			'<div class="level-chip" title="Level ' + lv.n + '"><span>' + esc(lv.lvl.mi) + "</span><small>" + state.xp + " XP</small></div></header>";
 
 		if (freezeMessage) {
@@ -682,19 +709,30 @@
 	// ---------------------------------------------------------------------
 	// UI: topics
 	// ---------------------------------------------------------------------
+	function topicNode(t, i) {
+		var c = counts(t.cards);
+		var pct = c.total ? (c.seen + c.solid) / (2 * c.total) : 0;
+		var done = c.solid === c.total;
+		return '<button class="node' + (done ? " done" : c.seen ? " started" : "") + (i % 2 ? " right" : "") + '" data-action="topic" data-topic="' + t.id + '">' +
+			'<span class="node-ring" style="--p:' + Math.round(pct * 100) + '"><span class="node-icon">' + t.icon + "</span></span>" +
+			'<span class="node-text"><strong>' + esc(t.mi) + "</strong><span>" + esc(t.en) + "</span>" +
+			'<small>' + c.seen + "/" + c.total + " introduced · " + c.solid + " learned</small></span></button>";
+	}
+
 	function renderTopics() {
+		var path = TOPICS.filter(function (t) { return t.group === "path"; });
+		var kupu = TOPICS.filter(function (t) { return t.group === "kupu"; });
 		var html = '<main class="page"><h1>Kaupapa <span class="muted small">Topics</span></h1>' +
 			'<p class="muted">Your learning path. New words come from the first unfinished topic, or tap a topic to focus on it.</p><div class="path">';
-		TOPICS.forEach(function (t, i) {
-			var c = counts(t.cards);
-			var pct = c.total ? (c.seen + c.solid) / (2 * c.total) : 0;
-			var done = c.solid === c.total;
-			html += '<button class="node' + (done ? " done" : c.seen ? " started" : "") + (i % 2 ? " right" : "") + '" data-action="topic" data-topic="' + t.id + '">' +
-				'<span class="node-ring" style="--p:' + Math.round(pct * 100) + '"><span class="node-icon">' + t.icon + "</span></span>" +
-				'<span class="node-text"><strong>' + esc(t.mi) + "</strong><span>" + esc(t.en) + "</span>" +
-				'<small>' + c.seen + "/" + c.total + " introduced · " + c.solid + " learned</small></span></button>";
-		});
-		html += "</div></main>";
+		path.forEach(function (t, i) { html += topicNode(t, i); });
+		html += "</div>";
+		if (kupu.length) {
+			html += '<h2 class="section-title">Kupu <span class="muted small">Common words · from Tākaro!</span></h2>' +
+				'<p class="muted small">Word sets from the Tākaro! game\'s reference cards. Tap one and choose "Study this topic".</p><div class="path">';
+			kupu.forEach(function (t, i) { html += topicNode(t, i); });
+			html += "</div>";
+		}
+		html += "</main>";
 		return html;
 	}
 
@@ -705,14 +743,17 @@
 		var fresh = newCards(id).length;
 		var html = '<main class="page"><button class="back" data-action="back">‹ Topics</button>' +
 			'<h1>' + t.icon + " " + esc(t.mi) + ' <span class="muted small">' + esc(t.en) + "</span></h1>" +
+			(t.source ? '<p class="source small">Source: ' + esc(t.source) + "</p>" : "") +
 			'<p class="muted">' + c.seen + "/" + c.total + " introduced · " + c.solid + " learned · " + c.mastered + " mastered</p>" +
 			'<div class="btn-row">' +
 			((due || fresh) ? '<button class="btn primary" data-action="start" data-mode="topic" data-topic="' + id + '">Study this topic</button>' : "") +
 			(c.seen ? '<button class="btn" data-action="start" data-mode="practice" data-topic="' + id + '">Practise</button>' : "") +
 			"</div><ul class=\"word-list\">";
+		var hasPics = t.cards.some(function (c) { return c.pic; });
 		t.cards.forEach(function (card) {
 			var st = cardStatus(card);
 			html += '<li class="word ' + st + '"><span class="status-dot" title="' + st + '"></span>' +
+				(card.pic ? '<span class="word-pic">' + card.pic + "</span>" : hasPics ? '<span class="word-pic"></span>' : "") +
 				'<div class="word-main"><span class="word-mi">' + (st === "new" ? '<span class="muted">' + blanks(card.mi) + "</span>" : blanks(card.mi)) + "</span>" +
 				'<span class="word-en">' + blanks(card.en) + "</span></div>" +
 				'<a class="teaka" href="' + teAkaUrl(card) + '" target="_blank" rel="noopener" title="Look up in Te Aka">Te Aka ↗</a></li>';
@@ -775,15 +816,7 @@
 			'<input name="next" type="password" autocomplete="new-password" minlength="8" placeholder="New password (8+ characters)" required>' +
 			'<button class="btn" type="submit">Change password</button></form></details>' +
 			'<button class="btn" data-action="logout">Sign out</button></section>';
-		if (user && user.admin) {
-			account += '<section class="card"><h2>Group admin</h2>' +
-				'<p class="small">Invite code: ' + (user.invite ? '<code class="invite">' + esc(user.invite) + "</code>" : '<span class="muted">not set — add REO_INVITE_CODE in Cloudflare</span>') + "</p>" +
-				'<p class="muted small">Friends sign up at durand.nz/reo with this code.</p>' +
-				'<details><summary>Reset a member\'s password</summary><form id="admin-form" class="mini-form">' +
-				'<input name="username" autocapitalize="none" autocorrect="off" placeholder="Their username" required>' +
-				'<input name="password" type="text" minlength="8" placeholder="New password (8+ characters)" required>' +
-				'<button class="btn" type="submit">Reset password</button></form></details></section>';
-		}
+		if (user && user.admin) account += renderAdmin();
 		return '<main class="page"><h1>Ētahi atu <span class="muted small">More</span></h1>' + account +
 			'<section class="card"><h2>Daily goal</h2><p class="muted small">Answers per day to keep your streak.</p>' + choice("goal", [5, 10, 20, 30], s.goal) +
 			'<h2>New words per day</h2>' + choice("newPerDay", [3, 5, 8, 12], s.newPerDay) + "</section>" +
@@ -807,7 +840,7 @@
 
 			'<section class="card"><h2>About the words</h2><p class="small">This deck is a hand-curated draft, not machine translation. Each word links to <a href="https://maoridictionary.co.nz" target="_blank" rel="noopener">Te Aka Māori Dictionary</a>, the authority. If something here disagrees with Te Aka, trust Te Aka. Spelling follows <a href="https://www.tetaurawhiri.govt.nz" target="_blank" rel="noopener">Te Taura Whiri i te Reo Māori</a> (Māori Language Commission) conventions.</p>' +
 			'<p class="muted small">' + CARDS.length + " cards · " + TOPICS.length + " topics · " + DECK.proverbs.length + " whakataukī</p></section>" +
-			'<p class="install-hint muted small">Tip: use "Add to Home Screen" in your phone\'s browser menu to install Reo like an app. It keeps working offline and syncs when you\'re back online.</p>' +
+			'<p class="install-hint muted small">Tip: use "Add to Home Screen" in your phone\'s browser menu to install Panana like an app. It keeps working offline and syncs when you\'re back online.</p>' +
 			"</main>";
 	}
 
@@ -823,6 +856,7 @@
 
 	function detailBlock(card) {
 		var html = '<div class="detail">';
+		if (card.pic && !(session && session.current && session.current.ex === "intro")) html += '<div class="pic small-pic" aria-hidden="true">' + card.pic + "</div>";
 		if (card.note) html += '<p class="note">' + esc(card.note) + "</p>";
 		if (card.ex) html += '<p class="ex"><b>' + esc(card.ex) + "</b><br><span class=\"muted\">" + esc(card.exEn) + "</span></p>";
 		html += '<a class="teaka" href="' + teAkaUrl(card) + '" target="_blank" rel="noopener">Look up “' + esc(card.lookup) + '” in Te Aka ↗</a></div>';
@@ -838,13 +872,17 @@
 
 		if (cur.ex === "intro") {
 			html += tag + '<div class="s-kicker new-kicker">✨ New word</div>' +
+				(card.pic ? '<div class="pic" aria-hidden="true">' + card.pic + "</div>" : "") +
 				'<div class="big-word">' + blanks(card.mi) + "</div>" +
 				'<div class="big-en">' + blanks(card.en) + "</div>" + detailBlock(card) +
 				'<div class="s-foot"><button class="btn primary big" data-action="intro-ok">Got it</button></div>';
-		} else if (cur.ex === "mc_mi" || cur.ex === "mc_en") {
+		} else if (cur.ex === "mc_mi" || cur.ex === "mc_en" || cur.ex === "pic") {
 			var prompt = cur.ex === "mc_mi" ? card.mi : card.en;
-			html += tag + '<div class="s-kicker">' + (cur.ex === "mc_mi" ? "What does this mean?" : "How do you say this in te reo?") + "</div>" +
-				'<div class="big-word' + (cur.ex === "mc_en" ? " en" : "") + '">' + blanks(prompt) + '</div><div class="options">';
+			var kicker = cur.ex === "mc_mi" ? "What does this mean?" : cur.ex === "pic" ? "What's this in te reo?" : "How do you say this in te reo?";
+			html += tag + '<div class="s-kicker">' + kicker + "</div>" +
+				(cur.ex === "pic" ? '<div class="pic quiz-pic" role="img" aria-label="picture">' + card.pic + "</div>" :
+					'<div class="big-word' + (cur.ex === "mc_en" ? " en" : "") + '">' + blanks(prompt) + "</div>") +
+				'<div class="options">';
 			cur.options.forEach(function (o, i) {
 				var cls = "option";
 				if (cur.answered) {
@@ -956,7 +994,7 @@
 		var blob = new Blob([JSON.stringify(state, null, 1)], { type: "application/json" });
 		var a = document.createElement("a");
 		a.href = URL.createObjectURL(blob);
-		a.download = "reo-backup-" + todayKey() + ".json";
+		a.download = "panana-backup-" + todayKey() + ".json";
 		document.body.appendChild(a);
 		a.click();
 		setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
@@ -976,7 +1014,7 @@
 				toast("Backup restored.");
 				render();
 			} catch (e) {
-				toast("That file isn't a Reo backup.");
+				toast("That file isn't a Panana backup.");
 			}
 		};
 		reader.readAsText(file);
@@ -992,6 +1030,7 @@
 				topicView = null;
 				render();
 				if (view === "ropu" || view === "home") refreshBoard();
+				if (view === "more" && user && user.admin) loadAdmin();
 				break;
 			case "board": boardMetric = el.getAttribute("data-metric"); render(true); break;
 			case "toggle-board":
@@ -1001,6 +1040,20 @@
 				render(true);
 				break;
 			case "logout": logout(); break;
+			case "admin-newcode":
+				if (confirm("Make a new invite code? The current one stops working straight away (existing members aren't affected).")) adminConfig({ newInvite: true }, "New invite code ready.");
+				break;
+			case "admin-closed": {
+				var closing = !adminData.config.closed;
+				adminConfig({ closed: closing }, closing ? "Sign-ups closed." : "Sign-ups open.");
+				break;
+			}
+			case "admin-max": adminConfig({ max: +el.getAttribute("data-max") }, "Member limit updated."); break;
+			case "admin-remove": {
+				var who = el.getAttribute("data-u");
+				if (confirm("Remove @" + who + "? This deletes their account and all their progress, and signs them out. It can't be undone.")) adminRemove(who);
+				break;
+			}
 			case "topic": topicView = el.getAttribute("data-topic"); render(); break;
 			case "back": topicView = null; render(); break;
 			case "start": startSession(el.getAttribute("data-mode"), el.getAttribute("data-topic")); break;
@@ -1065,7 +1118,7 @@
 		if (e.key === "Enter" && cur.answered && cur.ex !== "flash") {
 			e.preventDefault();
 			advance();
-		} else if (!cur.answered && (cur.ex === "mc_mi" || cur.ex === "mc_en") && /^[1-4]$/.test(e.key)) {
+		} else if (!cur.answered && (cur.ex === "mc_mi" || cur.ex === "mc_en" || cur.ex === "pic") && /^[1-4]$/.test(e.key)) {
 			onMc(+e.key - 1);
 		}
 	});
@@ -1117,7 +1170,7 @@
 		}
 		return fetch(API + path, opts).then(function (r) {
 			return r.json().catch(function () { return {}; }).then(function (data) {
-				if (r.status === 401) { location.href = "/reo/login"; throw new AuthError(); }
+				if (r.status === 401) { location.href = "/panana/login"; throw new AuthError(); }
 				return { status: r.status, ok: r.ok, data: data };
 			});
 		});
@@ -1167,7 +1220,9 @@
 		}
 		var lm = "";
 		Object.keys(state.days).forEach(function (k) { if (state.days[k].met && k > lm) lm = k; });
-		return { xp: state.xp, wk: wk, wx: wx, px: px, st: currentStreak(), lm: lm, lr: solidCount(), h: !!state.settings.hideFromBoard };
+		var la = "";
+		Object.keys(state.days).forEach(function (k) { if (state.days[k].reviews > 0 && k > la) la = k; });
+		return { xp: state.xp, wk: wk, wx: wx, px: px, st: currentStreak(), lm: lm, lr: solidCount(), la: la, h: !!state.settings.hideFromBoard };
 	}
 
 	function stripped(s) {
@@ -1242,7 +1297,7 @@
 					localStorage.removeItem(STORE_KEY);
 					localStorage.removeItem("reo.lastUser");
 				} catch (e) {}
-				location.href = "/reo/login";
+				location.href = "/panana/login";
 			});
 		};
 		if (dirty) push().then(go); else go();
@@ -1268,6 +1323,87 @@
 			toast(r.ok ? "Password reset for " + d.username + "." : r.data.error || "Couldn't reset.");
 			if (r.ok) form.reset();
 		}).catch(function () { toast("Can't reach the server."); });
+	}
+
+	// ---------------------------------------------------------------------
+	// Group admin (only shown to usernames listed in REO_ADMINS)
+	// ---------------------------------------------------------------------
+	var adminData = null; // { members, config }
+	var adminError = "";
+
+	function loadAdmin() {
+		api("GET", "admin/members").then(function (r) {
+			if (!r.ok) { adminError = r.data.error || "Couldn't load members."; }
+			else { adminData = r.data; adminError = ""; user.invite = r.data.config.invite; }
+			if (!session && view === "more") render(true);
+		}).catch(function () { adminError = "Can't reach the server."; if (view === "more") render(true); });
+	}
+
+	function adminConfig(change, okMsg) {
+		api("POST", "admin/config", change).then(function (r) {
+			if (!r.ok) return toast(r.data.error || "Couldn't save.");
+			adminData.config = r.data.config;
+			user.invite = r.data.config.invite;
+			toast(okMsg);
+			render(true);
+		}).catch(function () { toast("Can't reach the server."); });
+	}
+
+	function adminRemove(username) {
+		api("POST", "admin/remove", { username: username }).then(function (r) {
+			if (!r.ok) return toast(r.data.error || "Couldn't remove.");
+			toast("Removed @" + username + ".");
+			if (board) board = board.filter(function (e) { return e.u !== username; });
+			loadAdmin();
+		}).catch(function () { toast("Can't reach the server."); });
+	}
+
+	function daysAgo(key) {
+		if (!key) return "never";
+		var t = todayKey();
+		if (key === t) return "today";
+		if (key === addDays(t, -1)) return "yesterday";
+		var n = 0, k = key;
+		while (k < t && n < 400) { k = addDays(k, 1); n++; }
+		return n >= 400 ? "over a year ago" : n + " days ago";
+	}
+
+	function renderAdmin() {
+		var html = '<section class="card admin"><h2>Group admin</h2>';
+		if (!adminData) {
+			html += '<p class="muted small">' + (adminError ? esc(adminError) : "Loading members…") + "</p></section>";
+			return html;
+		}
+		var c = adminData.config, m = adminData.members;
+		html += '<div class="admin-row"><div><div class="eyebrow">Invite code</div>' +
+			(c.closed ? '<span class="muted">Sign-ups closed</span>' : c.invite ? '<code class="invite">' + esc(c.invite) + "</code>" : '<span class="muted">None set</span>') + "</div>" +
+			'<button class="btn" data-action="admin-newcode">New code</button></div>' +
+			'<p class="muted small">Friends sign up at durand.nz/panana with this code. If it gets shared too widely, make a new one — the old code stops working, and existing members keep their accounts.</p>' +
+			'<div class="toggle-row"><span>Allow new sign-ups</span><button class="chip' + (c.closed ? "" : " active") + '" data-action="admin-closed">' + (c.closed ? "Closed" : "Open") + "</button></div>" +
+			'<div class="toggle-row"><span>Member limit</span><span class="choices tight">' + [10, 25, 50].map(function (n) {
+				return '<button class="chip' + (c.max === n ? " active" : "") + '" data-action="admin-max" data-max="' + n + '">' + n + "</button>";
+			}).join("") + (([10, 25, 50].indexOf(c.max) === -1) ? '<button class="chip active">' + c.max + "</button>" : "") + "</span></div>";
+
+		html += '<h3 class="members-title">Members <span class="muted small">' + m.length + " of " + c.max + "</span></h3>";
+		if (m.length >= c.max) html += '<p class="banner warn small">The group is full — new sign-ups are blocked until you remove someone or raise the limit.</p>';
+		html += '<ul class="members">';
+		m.forEach(function (x) {
+			var active = x.lastActive === todayKey();
+			html += '<li class="member">' +
+				'<span class="avatar">' + esc((x.name || x.username).charAt(0).toUpperCase()) + "</span>" +
+				'<div class="member-main"><strong>' + esc(x.name) + "</strong> <span class=\"muted small\">@" + esc(x.username) + "</span>" +
+				(x.admin ? ' <span class="pill">admin</span>' : "") + (x.hidden ? ' <span class="pill warn">hidden</span>' : "") +
+				'<div class="muted small">Joined ' + (x.joined ? esc(x.joined.slice(0, 10)) : "?") + " · Last practised " + (active ? '<b class="good-text">today</b>' : daysAgo(x.lastActive)) + "</div>" +
+				'<div class="muted small">' + x.xp + " XP · " + x.words + " words · 🔥 " + (x.lastMet >= addDays(todayKey(), -1) ? x.streak : 0) + "</div></div>" +
+				(x.admin || x.username === user.username ? "" : '<button class="btn danger-sm" data-action="admin-remove" data-u="' + esc(x.username) + '">Remove</button>') +
+				"</li>";
+		});
+		html += "</ul>";
+		html += '<details><summary>Reset a member\'s password</summary><form id="admin-form" class="mini-form">' +
+			'<input name="username" autocapitalize="none" autocorrect="off" placeholder="Their username" required>' +
+			'<input name="password" type="text" minlength="8" placeholder="New password (8+ characters)" required>' +
+			'<button class="btn" type="submit">Reset password</button></form></details></section>';
+		return html;
 	}
 
 	// ---------------------------------------------------------------------
@@ -1374,7 +1510,7 @@
 					'<span class="score"><strong>' + r[boardMetric] + "</strong><small>" + units[boardMetric] + "</small></span></li>";
 			});
 			html += "</ol>";
-			if (rows.length < 2) html += '<p class="muted">It\'s just you so far. Share the invite code and durand.nz/reo with friends to get a league going.</p>';
+			if (rows.length < 2) html += '<p class="muted">It\'s just you so far. Share the invite code and durand.nz/panana with friends to get a league going.</p>';
 			if (boardMetric === "week") {
 				var left = 7 - dayOfWeek(todayKey());
 				html += '<p class="muted small center">The weekly league resets on Monday · ' + (left === 1 ? "last day!" : left + " days left") + "</p>";
@@ -1418,7 +1554,7 @@
 			refreshBoard(true);
 		}).catch(function (e) {
 			if (e instanceof AuthError) return;
-			root.innerHTML = '<main class="page"><h1>Reo</h1><p>You\'re offline and haven\'t signed in on this device yet. Connect to the internet and try again.</p></main>';
+			root.innerHTML = '<main class="page"><h1>Panana</h1><p>You\'re offline and haven\'t signed in on this device yet. Connect to the internet and try again.</p></main>';
 		});
 	}
 
@@ -1434,5 +1570,5 @@
 	}
 
 	// test hook
-	window.__reo = { state: function () { return state; }, mergeStates: mergeStates, summary: summary, pushNow: pushNow, CARDS: CARDS, schedule: schedule, addDays: addDays, currentStreak: currentStreak };
+	window.__reo = { state: function () { return state; }, pickExercise: function (id, item) { return pickExercise(CARD_BY_ID[id], item || { kind: "review" }); }, distractors: function (id, f) { return distractors(CARD_BY_ID[id], f); }, mergeStates: mergeStates, summary: summary, pushNow: pushNow, CARDS: CARDS, schedule: schedule, addDays: addDays, currentStreak: currentStreak };
 })();

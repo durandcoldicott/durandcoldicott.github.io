@@ -3,7 +3,7 @@
 
 	// Already signed in? Go straight to the app.
 	fetch("/api/reo/me", { credentials: "same-origin" })
-		.then(function (r) { if (r.ok) location.replace("/reo/"); })
+		.then(function (r) { if (r.ok) location.replace("/panana/"); })
 		.catch(function () {});
 
 	var forms = { login: document.getElementById("login-form"), join: document.getElementById("join-form") };
@@ -37,7 +37,7 @@
 					return r.json().catch(function () { return {}; }).then(function (body) {
 						if (!r.ok) throw new Error(body.error || "Something went wrong. Try again.");
 						try { localStorage.setItem("reo.lastUser", JSON.stringify(body)); } catch (x) {}
-						location.replace("/reo/");
+						location.replace("/panana/");
 					});
 				})
 				.catch(function (x) {

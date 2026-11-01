@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+	<!-- Panana: a banana on warm yellow -->
+	<rect width="512" height="512" fill="#ffd84d"/>
+	<circle cx="256" cy="256" r="196" fill="#fff3c2"/>
+	<!-- banana body -->
+	<path d="M128 196 C 132 318 228 398 336 380 C 380 372 410 344 418 318 C 422 304 410 296 398 304 C 360 330 300 336 248 312 C 196 288 164 244 156 192 C 154 176 128 178 128 196 Z"
+		fill="#f5c400" stroke="#3b2a05" stroke-width="14" stroke-linejoin="round"/>
+	<!-- inner curve / highlight -->
+	<path d="M170 222 C 190 290 250 334 330 344" fill="none" stroke="#fff1a8" stroke-width="14" stroke-linecap="round" opacity=".9"/>
+	<!-- stem -->
+	<path d="M408 310 L 440 282" stroke="#5a4210" stroke-width="22" stroke-linecap="round"/>
+	<!-- tip -->
+	<circle cx="142" cy="186" r="11" fill="#3b2a05"/>
+</svg>

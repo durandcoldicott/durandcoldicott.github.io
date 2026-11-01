@@ -1,5 +1,5 @@
 import { KNOWLEDGE_BASE } from "./data/knowledge-base.js";
-import { handleReo } from "./worker/reo.js";
+import { handlePanana } from "./worker/panana.js";
 
 const MODEL = "claude-haiku-4-5";
 const MAX_INPUT_CHARS = 500;
@@ -134,8 +134,8 @@ export default {
 	async fetch(request, env, ctx) {
 		const url = new URL(request.url);
 
-		const reo = await handleReo(request, env, url);
-		if (reo) return reo;
+		const panana = await handlePanana(request, env, url);
+		if (panana) return panana;
 
 		if (request.method === "POST" && url.pathname === "/api/chat") {
 			const limited = await checkRateLimit(request, env, url.pathname);
