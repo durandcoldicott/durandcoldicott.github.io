@@ -20,7 +20,7 @@
 	}
 
 	DECK.topics.forEach(function (t) {
-		var topic = { id: t.id, mi: t.mi, en: t.en, icon: t.icon, group: t.group || "path", source: t.source || "", term: t.term || 0, cards: [] };
+		var topic = { id: t.id, mi: t.mi, en: t.en, icon: t.icon, group: t.group || "path", source: t.source || "", level: t.level || 0, cards: [] };
 		t.cards.forEach(function (raw) {
 			if (raw && typeof raw === "object" && !Array.isArray(raw) && raw.gen) {
 				var g = { id: t.id + "-gen-" + raw.gen, mi: raw.mi, en: raw.en, alt: [], note: raw.note || "", lookup: "",
@@ -226,6 +226,27 @@
 		c.solid = c.learned + c.mastered;
 		return c;
 	}
+	// ---------------------------------------------------------------------
+	// Levels (Taumata): each unlocks when 70% of the previous level's words
+	// and patterns have been practised (answered right at least once).
+	// ---------------------------------------------------------------------
+	var LEVEL_UNLOCK = 0.7;
+	var MAX_LEVEL = TOPICS.reduce(function (m, t) { return Math.max(m, t.level || 0); }, 0);
+	function levelTopics(n) { return TOPICS.filter(function (t) { return t.group === "levels" && t.level === n; }); }
+	function levelCards(n) {
+		var seenIds = {}, out = [];
+		levelTopics(n).forEach(function (t) { t.cards.forEach(function (c) { if (!seenIds[c.id]) { seenIds[c.id] = 1; out.push(c); } }); });
+		return out;
+	}
+	function levelProgress(n) {
+		var cards = levelCards(n);
+		if (!cards.length) return 0;
+		return cards.filter(function (c) { var cs = state.cards[c.id]; return cs && cs.right > 0; }).length / cards.length;
+	}
+	function levelUnlocked(n) { return n <= 1 || levelProgress(n - 1) >= LEVEL_UNLOCK; }
+	function topicLocked(t) { return t.group === "levels" && !levelUnlocked(t.level); }
+	function currentLevel() { var n = 1; while (n < MAX_LEVEL && levelUnlocked(n + 1)) n++; return n; }
+
 	function isDue(card) {
 		var cs = state.cards[card.id];
 		return !!cs && cs.due <= todayKey();
@@ -294,10 +315,10 @@
 		{ id: "orig", icon: "🥝", mi: "Kupu Taketake", en: "Know all the Tākaro! Original words", test: function () { return topicKnown("orig"); } },
 		{ id: "wild", icon: "🐋", mi: "Te Taiao", en: "Know all the Tākaro! Into the Wild words", test: function () { return topicKnown("wild"); } },
 		{ id: "rerenga", icon: "💬", mi: "Kaikōrero", en: "Answer 25 sentence questions correctly", test: function () { return (state.stats.sentences || 0) >= 25; } },
-		{ id: "term1", icon: "🎓", mi: "Wāhanga tuatahi", en: "Know every Term 1 revision topic", test: function () { return ["tikanga", "pehea", "hua", "tau1", "ahua"].every(topicKnown); } },
-		{ id: "term2", icon: "🎓", mi: "Wāhanga tuarua", en: "Know every Term 2 revision topic", test: function () { return ["mihi2", "tangata", "tuahua", "tuwahi"].every(topicKnown); } },
-		{ id: "term3", icon: "🎓", mi: "Wāhanga tuatoru", en: "Know every Term 3 revision topic", test: function () { return ["whanau3", "pupuri", "moku", "tupou", "tohutohu"].every(topicKnown); } },
-		{ id: "ahua", icon: "🔷", mi: "Āhua, Tae, Tatau", en: "Know all the course words and patterns for shapes, colours and counting", test: function () { return topicKnown("ahua"); } },
+		{ id: "level1", icon: "🥉", mi: "Taumata tuatahi", en: "Know every topic in Level 1", test: function () { return levelTopics(1).every(function (t) { return topicKnown(t.id); }); } },
+		{ id: "level2", icon: "🥈", mi: "Taumata tuarua", en: "Know every topic in Level 2", test: function () { return levelTopics(2).every(function (t) { return topicKnown(t.id); }); } },
+		{ id: "level3", icon: "🥇", mi: "Taumata tuatoru", en: "Know every topic in Level 3", test: function () { return levelTopics(3).every(function (t) { return topicKnown(t.id); }); } },
+		{ id: "ahua", icon: "🔷", mi: "Āhua, Tae, Tatau", en: "Know all the words and patterns for shapes, colours and counting", test: function () { return topicKnown("ahua"); } },
 		{ id: "words25", icon: "📗", mi: "Rua tekau mā rima", en: "25 words learned", test: function () { return solidCount() >= 25; } },
 		{ id: "words100", icon: "📚", mi: "Kotahi rau", en: "100 words learned", test: function () { return solidCount() >= 100; } },
 		{ id: "perfect", icon: "💎", mi: "Tika rawa", en: "A perfect lesson (10+ answers, no mistakes)", test: function () { return state.stats.perfect >= 1; } },
@@ -467,7 +488,7 @@
 	}
 	function knownIds(ids) { return ids.filter(function (id) { return CARD_BY_ID[id] && known(id); }); }
 
-	// ---- Term 3 ----
+	// ---- whānau, possessives, about me, pronouns ----
 	var NAMES_F = ["Mere", "Aroha", "Kiri", "Ana", "Hana", "Ripeka"];
 	var NAMES_M = ["Hone", "Wiremu", "Rangi", "Tamati", "Pita", "Mikaere"];
 	// whānau intro relations: [card that teaches it, people count, Māori tail, English tail, picture]
@@ -489,7 +510,7 @@
 		return "Ko " + names[0] + ", ko " + names[1] + " rātou ko " + names[2];
 	}
 
-	// Possessives: nouns whose category follows the course's rules
+	// Possessives: only nouns whose a/o category follows clear rules
 	var O_NOUNS = ["orig-pōtae", "bits-kaka", "bits-tarau", "bits-tōkena", "orig-tīhāte", "pupuri-mōwhiti", "wahi-whare", "orig-paihikara", "orig-motukā", "wild-waka", "orig-kutarere"];
 	var A_NOUNS = ["orig-pene", "bits-pene-rākau", "orig-pukapuka", "kai-āporo", "kai-panana", "hua-rōpere", "orig-tiakarete", "wild-kurī", "wild-ngeru", "bits-kapu", "bits-kitā", "orig-whutupōro", "tuwahi-pōro"];
 
@@ -530,7 +551,7 @@
 	function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
 	function words(sentence) { return sentence.replace(/[.?!]$/, "").split(" "); }
 
-	// Counting answers follow the course's rule: 1 → Kotahi te …, 2–9 → E/Toko + number ngā …, 10 → Tekau ngā …
+	// Counting: 1 → Kotahi te …, 2–9 → E/Toko + number ngā …, 10+ → Tekau (mā …) ngā …
 	function countAnswer(n, sg, pl, people) {
 		if (n === 1) return "Kotahi te " + sg + ".";
 		if (n >= 10) return cap(NUM_WORDS[n]) + " ngā " + pl + ".";
@@ -568,7 +589,7 @@
 				return { ok: knownNumbers().filter(function (n) { return n > 1; }).length >= 3 && known("moku-e-x-ōku-tau"), need: "Learn 3 numbers and “E ___ ōku tau” first." };
 			case "profile":
 				return { ok: knownNumbers().filter(function (n) { return n > 1; }).length >= 3 && SWATCH_IDS.filter(known).length >= 2 && knownIds(PLACE_IDS).length >= 2 && knownIds(LIKES).length >= 2,
-					need: "Learn some numbers, 2 colours, 2 place names (Term 2 mihi) and 2 foods first." };
+					need: "Learn some numbers, 2 colours, 2 place names (from the greetings topic) and 2 foods first." };
 			case "pronoun":
 				return { ok: PRONOUNS.filter(function (x) { return known(x[0]); }).length >= 4, need: "Learn 4 of the pronouns first." };
 			case "command":
@@ -715,7 +736,7 @@
 			var placesW = knownIds(LOC_PLACES[loc[0]]), plc = CARD_BY_ID[pick(placesW)];
 			var sayW = function (l, place, th) { return "Kei " + l[1] + " " + l[2] + " te " + place.mi + " te " + th.mi + "."; };
 			var ansW = sayW(loc, plc, thing);
-			// the course also teaches: Kei runga te pukapuka i te tēpu
+			// the other accepted word order: Kei runga te pukapuka i te tēpu
 			var altW = "Kei " + loc[1] + " te " + thing.mi + " " + loc[2] + " te " + plc.mi + ".";
 			var wrongW = [];
 			shuffle(LOCS.filter(function (l) { return l !== loc; })).sort(function (a, b) { return (known(b[0]) ? 1 : 0) - (known(a[0]) ? 1 : 0); })
@@ -862,7 +883,10 @@
 	}
 	function newCards(topicId) {
 		var list = [];
-		var topics = topicId ? [TOPIC_BY_ID[topicId]] : TOPICS;
+		var topics = topicId ? [TOPIC_BY_ID[topicId]] : TOPICS.filter(function (t) { return t.group === "levels"; })
+			.sort(function (a, b) { return a.level - b.level; })
+			.concat(TOPICS.filter(function (t) { return t.group !== "levels"; }));
+		topics = topics.filter(function (t) { return !topicLocked(t); });
 		topics.forEach(function (t) {
 			t.cards.forEach(function (c) { if (!state.cards[c.id] && (!c.gen || genAvailable(c).ok) && list.indexOf(c) === -1) list.push(c); });
 		});
@@ -1239,22 +1263,25 @@
 	function renderTopics() {
 		var path = TOPICS.filter(function (t) { return t.group === "path"; });
 		var kupu = TOPICS.filter(function (t) { return t.group === "kupu"; });
-		var course = TOPICS.filter(function (t) { return t.group === "course"; });
+		var levelled = TOPICS.filter(function (t) { return t.group === "levels"; });
 		var html = '<main class="page"><h1>Kaupapa <span class="muted small">Topics</span></h1>';
-		if (course.length) {
-			html += '<h2 class="section-title first">Akoranga <span class="muted small">Our course · NMIT Te Reo Level 1</span></h2>' +
-				'<p class="muted small">Revision of what we\'ve been taught, term by term. Sentences unlock as you learn the words they use.</p>';
-			var TERM_NAMES = ["", "Wāhanga tuatahi · Term 1", "Wāhanga tuarua · Term 2", "Wāhanga tuatoru · Term 3", "Wāhanga tuawhā · Term 4"];
-			[1, 2, 3, 4].forEach(function (term) {
-				var ts = course.filter(function (t) { return t.term === term; });
-				if (!ts.length) return;
-				html += '<h3 class="term-title">' + TERM_NAMES[term] + '</h3><div class="path">';
+		if (levelled.length) {
+			html += '<h2 class="section-title first">Ngā Taumata <span class="muted small">Levels</span></h2>' +
+				'<p class="muted small">Words and sentences that build on each other. Each level opens when you\'ve practised ' + Math.round(LEVEL_UNLOCK * 100) + '% of the one before.</p>';
+			for (var lvN = 1; lvN <= MAX_LEVEL; lvN++) {
+				var ts = levelTopics(lvN);
+				if (!ts.length) continue;
+				var open = levelUnlocked(lvN), pctL = Math.round(levelProgress(lvN) * 100);
+				html += '<div class="level-head' + (open ? "" : " locked") + '"><h3 class="term-title">' + (open ? "" : "🔒 ") + "Taumata " + lvN + "</h3>" +
+					'<div class="bar small-bar"><span style="width:' + pctL + '%"></span></div><span class="muted small">' + pctL + "%</span></div>" +
+					(open ? "" : '<p class="muted small">Opens when Taumata ' + (lvN - 1) + " is " + Math.round(LEVEL_UNLOCK * 100) + "% practised (now " + Math.round(levelProgress(lvN - 1) * 100) + "%).</p>") +
+					'<div class="path' + (open ? "" : " locked") + '">';
 				ts.forEach(function (t, i) { html += topicNode(t, i); });
 				html += "</div>";
-			});
+			}
 		}
-		html += '<h2 class="section-title">Learning path</h2>' +
-			'<p class="muted small">New words come from the first unfinished topic, or tap a topic to focus on it.</p><div class="path">';
+		html += '<h2 class="section-title">Ngā Kaupapa <span class="muted small">Word topics</span></h2>' +
+			'<p class="muted small">Everyday vocabulary. Tap a topic to focus on it.</p><div class="path">';
 		path.forEach(function (t, i) { html += topicNode(t, i); });
 		html += "</div>";
 		if (kupu.length) {
@@ -1275,9 +1302,11 @@
 		var html = '<main class="page"><button class="back" data-action="back">‹ Topics</button>' +
 			'<h1>' + t.icon + " " + esc(t.mi) + ' <span class="muted small">' + esc(t.en) + "</span></h1>" +
 			(t.source ? '<p class="source small">Source: ' + esc(t.source) + "</p>" : "") +
+			(t.group === "levels" ? '<p class="source small">Taumata ' + t.level + "</p>" : "") +
+			(topicLocked(t) ? '<p class="banner warn small">🔒 This opens when Taumata ' + (t.level - 1) + " is " + Math.round(LEVEL_UNLOCK * 100) + "% practised.</p>" : "") +
 			'<p class="muted">' + c.seen + "/" + c.total + " introduced · " + c.solid + " learned · " + c.mastered + " mastered</p>" +
 			'<div class="btn-row">' +
-			((due || fresh) ? '<button class="btn primary" data-action="start" data-mode="topic" data-topic="' + id + '">Study this topic</button>' : "") +
+			((due || fresh) && !topicLocked(t) ? '<button class="btn primary" data-action="start" data-mode="topic" data-topic="' + id + '">Study this topic</button>' : "") +
 			(c.seen ? '<button class="btn" data-action="start" data-mode="practice" data-topic="' + id + '">Practise</button>' : "") +
 			"</div><ul class=\"word-list\">";
 		var hasPics = t.cards.some(function (c) { return c.pic; });
@@ -1529,6 +1558,11 @@
 			html += '<section class="card proverb open reveal"><div class="eyebrow">Whakataukī o te rā — unlocked</div><p class="proverb-mi">' + esc(p[0]) + '</p><p class="proverb-en">' + esc(p[1]) + "</p></section>";
 		} else if (!d.met) {
 			html += '<p class="muted center">' + (state.settings.goal - d.reviews) + " more answers to reach today's goal.</p>";
+		}
+		if (!session.goalJustMet && Math.random() < 0.25) {
+			// an occasional whakataukī, just as a tip — not something to learn
+			var tipI = Math.floor(Math.random() * DECK.proverbs.length), tip = DECK.proverbs[tipI];
+			html += '<section class="card proverb open tip"><div class="eyebrow">💡 Whakataukī</div><p class="proverb-mi">' + esc(tip[0]) + '</p><p class="proverb-en">' + esc(tip[1]) + "</p></section>";
 		}
 		(session.newAchievements || []).forEach(function (a) {
 			html += '<div class="card achievement-pop"><span class="badge-icon">' + a.icon + "</span><div><div class=\"eyebrow\">Achievement unlocked</div><strong>" + esc(a.mi) + "</strong><br><span class=\"muted\">" + esc(a.en) + "</span></div></div>";

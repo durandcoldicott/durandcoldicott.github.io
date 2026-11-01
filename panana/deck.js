@@ -131,10 +131,10 @@ window.REO_DECK = {
 				["whero", "red", { pic: "🟥" }],
 				["kākāriki", "green", { note: "Also the name of a native green parakeet.", pic: "🟩" }],
 				["kōwhai", "yellow", { note: "Also the native tree with yellow flowers.", pic: "🟨" }],
-				["kikorangi", "blue", { alt: ["kahurangi"], pic: "🟦", note: "Our course also uses kahurangi for blue." }],
+				["kikorangi", "blue", { alt: ["kahurangi"], pic: "🟦", note: "Also kahurangi." }],
 				["karaka", "orange", { note: "Also a native tree with orange berries.", pic: "🟧" }],
 				["māwhero", "pink", { pic: "🩷" }],
-				["parauri", "brown", { alt: ["paraone", "parāone"], pic: "🟫", note: "Our course also uses paraone / parāone for brown." }],
+				["parauri", "brown", { alt: ["paraone", "parāone"], pic: "🟫", note: "Also paraone / parāone." }],
 				["mā", "white", { pic: "⬜" }],
 				["pango", "black", { alt: ["mangu"], pic: "⬛", note: "Also mangu." }],
 			],
@@ -538,19 +538,18 @@ window.REO_DECK = {
 		},
 
 		// -----------------------------------------------------------------
-		// Akoranga: our NMIT Te Reo Māori Level 1 course content, built from
-		// the course's own word lists and sentence patterns (our own examples
-		// are generated from words each learner already knows).
+		// Taumata (levels): a progression of words and sentence patterns.
+		// Each level unlocks when 70% of the previous one has been practised.
+		// Example sentences are generated from words each learner already knows.
 		// { gen: ... } entries are sentence patterns: after the intro, every
 		// review is a fresh sentence built from your known words.
 		// -----------------------------------------------------------------
 		{
 			id: "tikanga",
-			group: "course",
-			term: 1,
-			source: "NMIT Te Reo Māori Level 1 — Term 1: Tikanga",
+			group: "levels",
+			level: 1,
 			mi: "Ngā Tikanga",
-			en: "Our class values",
+			en: "Values",
 			icon: "🤝",
 			cards: [
 				["tikanga", "cultural practices, values and principles", { pic: "🧭" }],
@@ -566,9 +565,8 @@ window.REO_DECK = {
 		},
 		{
 			id: "pehea",
-			group: "course",
-			term: 1,
-			source: "NMIT Te Reo Māori Level 1 — Term 1: Kei te pēhea koe?",
+			group: "levels",
+			level: 1,
 			mi: "Kei te pēhea koe?",
 			en: "How are you?",
 			icon: "😊",
@@ -582,9 +580,8 @@ window.REO_DECK = {
 		},
 		{
 			id: "hua",
-			group: "course",
-			term: 1,
-			source: "NMIT Te Reo Māori Level 1 — Term 1: Huarākau, tēnei/tēnā/tērā, te/ngā",
+			group: "levels",
+			level: 1,
 			mi: "Huarākau me Tēnei",
 			en: "Fruit & this / that",
 			icon: "🍓",
@@ -598,7 +595,7 @@ window.REO_DECK = {
 				["rōpere", "strawberry", { pic: "🍓" }],
 				["merengi", "melon", { pic: "🍈" }],
 				["rēmana", "lemon", { pic: "🍋" }],
-				["kerepi", "grapes", { alt: ["kerepe"], pic: "🍇", note: "Our course spells it kerepi; you'll also see kerepe." }],
+				["kerepi", "grapes", { alt: ["kerepe"], pic: "🍇", note: "Also spelled kerepe." }],
 				["tēnei", "this (by me)", { pic: "👇" }],
 				["tēnā", "that (by you)", { pic: "👉" }],
 				["tērā", "that (over there)", { pic: "🔭" }],
@@ -617,9 +614,8 @@ window.REO_DECK = {
 		},
 		{
 			id: "tau1",
-			group: "course",
-			term: 1,
-			source: "NMIT Te Reo Māori Level 1 — Term 1: Ngā Tau",
+			group: "levels",
+			level: 1,
 			mi: "Ngā Tau 1–20",
 			en: "Numbers 1 to 20",
 			icon: "🔢",
@@ -631,9 +627,8 @@ window.REO_DECK = {
 		},
 		{
 			id: "ahua",
-			group: "course",
-			term: 1,
-			source: "NMIT Te Reo Māori Level 1 — Ngā āhua, ngā tae, E hia? / Tokohia?",
+			group: "levels",
+			level: 1,
 			mi: "Āhua, Tae, Tatau",
 			en: "Shapes, colours & counting",
 			icon: "🔷",
@@ -668,9 +663,8 @@ window.REO_DECK = {
 		},
 		{
 			id: "mihi2",
-			group: "course",
-			term: 2,
-			source: "NMIT Te Reo Māori Level 1 — Term 2: Mihi, Paku Mihi",
+			group: "levels",
+			level: 2,
 			mi: "Ngā Mihi me te Paku Mihi",
 			en: "Greetings & short introduction",
 			icon: "🙋",
@@ -700,9 +694,8 @@ window.REO_DECK = {
 		},
 		{
 			id: "tangata",
-			group: "course",
-			term: 2,
-			source: "NMIT Te Reo Māori Level 1 — Term 2: Ngā tāngata, Tokohia?",
+			group: "levels",
+			level: 2,
 			mi: "Ngā Tāngata",
 			en: "People (for Tokohia?)",
 			icon: "🧑‍🤝‍🧑",
@@ -724,9 +717,8 @@ window.REO_DECK = {
 		},
 		{
 			id: "tuahua",
-			group: "course",
-			term: 2,
-			source: "NMIT Te Reo Māori Level 1 — Term 2: Ngā kupu tūāhua, Rere āhua",
+			group: "levels",
+			level: 2,
 			mi: "Ngā Kupu Tūāhua",
 			en: "Describing words",
 			icon: "🍭",
@@ -756,9 +748,8 @@ window.REO_DECK = {
 		},
 		{
 			id: "tuwahi",
-			group: "course",
-			term: 2,
-			source: "NMIT Te Reo Māori Level 1 — Term 2: Tūwahi (locatives)",
+			group: "levels",
+			level: 2,
 			mi: "Tūwahi — Kei hea?",
 			en: "Where? (locatives)",
 			icon: "📍",
@@ -789,9 +780,8 @@ window.REO_DECK = {
 		},
 		{
 			id: "whanau3",
-			group: "course",
-			term: 3,
-			source: "NMIT Te Reo Māori Level 1 — Term 3: Introducing your whānau",
+			group: "levels",
+			level: 3,
 			mi: "Taku Whānau",
 			en: "Introducing my whānau",
 			icon: "👨‍👩‍👧",
@@ -813,9 +803,8 @@ window.REO_DECK = {
 		},
 		{
 			id: "pupuri",
-			group: "course",
-			term: 3,
-			source: "NMIT Te Reo Māori Level 1 — Term 3: A me te O (possessives)",
+			group: "levels",
+			level: 3,
 			mi: "Tāku, Āku, Tōku, Ōku",
 			en: "My (possessives)",
 			icon: "🎒",
@@ -836,9 +825,8 @@ window.REO_DECK = {
 		},
 		{
 			id: "moku",
-			group: "course",
-			term: 3,
-			source: "NMIT Te Reo Māori Level 1 — Term 3: Describing myself and others",
+			group: "levels",
+			level: 3,
 			mi: "Kōrero Mōku, Mōna",
 			en: "About me / about them",
 			icon: "🪪",
@@ -869,9 +857,8 @@ window.REO_DECK = {
 		},
 		{
 			id: "tupou",
-			group: "course",
-			term: 3,
-			source: "NMIT Te Reo Māori Level 1 — Term 3: Tūpou (personal pronouns)",
+			group: "levels",
+			level: 3,
 			mi: "Tūpou",
 			en: "Personal pronouns",
 			icon: "🗣️",
@@ -897,9 +884,8 @@ window.REO_DECK = {
 		},
 		{
 			id: "tohutohu",
-			group: "course",
-			term: 3,
-			source: "NMIT Te Reo Māori Level 1 — Ngā Tohutohu (commands)",
+			group: "levels",
+			level: 3,
 			mi: "Ngā Tohutohu",
 			en: "Commands & instructions",
 			icon: "🫴",
