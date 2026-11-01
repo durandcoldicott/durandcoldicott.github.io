@@ -251,6 +251,56 @@ window.REO_DECK = {
 				["Ka nui te pai", "Very good / excellent", { lookup: "pai" }],
 			],
 		},
+
+		// -----------------------------------------------------------------
+		// Kupu: common-word sets from the Tākaro! game's reference cards.
+		// These appear in their own "Kupu" section on the Topics screen.
+		// English glosses follow the card (spelling typos on the card fixed);
+		// as everywhere, check against Te Aka via the link on each word.
+		// extras.pic is an emoji shown when learning the word and after
+		// answering — never in the question, so it can't give the answer away.
+		// -----------------------------------------------------------------
+		{
+			id: "kare",
+			group: "kupu",
+			source: "Tākaro! reference words — Feelings",
+			mi: "Kare-ā-roto",
+			en: "Feelings",
+			icon: "😊",
+			cards: [
+				["aroha", "love", { pic: "🥰" }],
+				["harikoa", "happy", { pic: "😄" }],
+				["heahea", "silly", { pic: "🤪" }],
+				["hiainu", "thirsty", { pic: "🥤" }],
+				["hiakai", "hungry", { pic: "😋" }],
+				["hiamoe", "sleepy", { pic: "😴" }],
+				["hūiki", "shy", { pic: "🙈" }],
+				["kaikaha", "impatient", { pic: "⏳" }],
+				["katakata", "laughter", { pic: "😂" }],
+				["ketekete", "disappointed", { pic: "😞" }],
+				["kiriweti", "grumpy", { pic: "😒" }],
+				["kōrero", "talk", { pic: "🗣️" }],
+				["māhirahira", "curious", { pic: "🧐" }],
+				["manaaki", "caring", { pic: "🤗" }],
+				["manahau", "excited", { pic: "🤩" }],
+				["mataku", "scared", { pic: "😨" }],
+				["māuiui", "sick", { pic: "🤒" }],
+				["menemene", "smiling", { pic: "😊" }],
+				["mīharo", "amazed", { pic: "🤯" }],
+				["ngenge", "tired", { pic: "🥱" }],
+				["ohorere", "surprised", { pic: "😮" }],
+				["pōhēhē", "confused", { pic: "😕" }],
+				["pōuri", "sad", { pic: "😢" }],
+				["pukuriri", "angry", { pic: "😡" }],
+				["taiatea", "nervous", { pic: "😬" }],
+				["tangitangi", "crying", { pic: "😭" }],
+				["tonotono", "bossy", { pic: "👉" }],
+				["whakahī", "proud", { pic: "😎" }],
+				["whakamā", "embarrassed", { pic: "😳" }],
+				["whakararu", "frustrated", { pic: "😣" }],
+				["whakarongo", "listening", { pic: "👂" }],
+			],
+		},
 	],
 
 	// Whakataukī — one is revealed each day once you hit your daily goal.

@@ -357,3 +357,9 @@ summary { cursor: pointer; color: var(--brand); font-weight: 600; padding: 6px 0
 .member .pill { display: inline-block; }
 .btn.danger-sm { color: var(--bad); min-height: 36px; padding: 6px 10px; font-size: .85rem; flex-shrink: 0; }
 .good-text { color: var(--good); }
+
+/* ---------- kupu pictures ---------- */
+.pic { font-size: 4rem; line-height: 1; margin: 8px 0 4px; }
+.pic.small-pic { font-size: 2.4rem; margin: 4px 0; }
+.word-pic { font-size: 1.4rem; width: 1.6em; text-align: center; flex-shrink: 0; }
+.source { color: var(--accent); font-weight: 600; margin: -4px 0 4px; }

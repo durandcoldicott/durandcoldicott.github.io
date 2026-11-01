@@ -19,7 +19,7 @@
 	}
 
 	DECK.topics.forEach(function (t) {
-		var topic = { id: t.id, mi: t.mi, en: t.en, icon: t.icon, cards: [] };
+		var topic = { id: t.id, mi: t.mi, en: t.en, icon: t.icon, group: t.group || "path", source: t.source || "", cards: [] };
 		t.cards.forEach(function (raw) {
 			var extra = raw[2] || {};
 			var card = {
@@ -31,6 +31,7 @@
 				lookup: extra.lookup || raw[0].replace(/_+/g, "").replace(/[?!.,]/g, "").replace(/\s+/g, " ").trim(),
 				ex: extra.ex || "",
 				exEn: extra.exEn || "",
+				pic: extra.pic || "",
 				topic: t.id,
 				pattern: raw[0].indexOf("___") !== -1,
 			};
@@ -264,6 +265,7 @@
 		{ id: "pepeha", icon: "⛰️", mi: "Taku pepeha", en: "Know all the pepeha patterns — now write yours", test: function () { return topicKnown("pepeha"); } },
 		{ id: "count", icon: "🔢", mi: "Tatau", en: "Know all the numbers", test: function () { return topicKnown("tau"); } },
 		{ id: "days", icon: "📅", mi: "Ngā rā", en: "Know all the days and time words", test: function () { return topicKnown("wa"); } },
+		{ id: "kare", icon: "😊", mi: "Kare-ā-roto", en: "Know all the Tākaro! feelings words", test: function () { return topicKnown("kare"); } },
 		{ id: "words25", icon: "📗", mi: "Rua tekau mā rima", en: "25 words learned", test: function () { return solidCount() >= 25; } },
 		{ id: "words100", icon: "📚", mi: "Kotahi rau", en: "100 words learned", test: function () { return solidCount() >= 100; } },
 		{ id: "perfect", icon: "💎", mi: "Tika rawa", en: "A perfect lesson (10+ answers, no mistakes)", test: function () { return state.stats.perfect >= 1; } },
@@ -682,19 +684,30 @@
 	// ---------------------------------------------------------------------
 	// UI: topics
 	// ---------------------------------------------------------------------
+	function topicNode(t, i) {
+		var c = counts(t.cards);
+		var pct = c.total ? (c.seen + c.solid) / (2 * c.total) : 0;
+		var done = c.solid === c.total;
+		return '<button class="node' + (done ? " done" : c.seen ? " started" : "") + (i % 2 ? " right" : "") + '" data-action="topic" data-topic="' + t.id + '">' +
+			'<span class="node-ring" style="--p:' + Math.round(pct * 100) + '"><span class="node-icon">' + t.icon + "</span></span>" +
+			'<span class="node-text"><strong>' + esc(t.mi) + "</strong><span>" + esc(t.en) + "</span>" +
+			'<small>' + c.seen + "/" + c.total + " introduced · " + c.solid + " learned</small></span></button>";
+	}
+
 	function renderTopics() {
+		var path = TOPICS.filter(function (t) { return t.group === "path"; });
+		var kupu = TOPICS.filter(function (t) { return t.group === "kupu"; });
 		var html = '<main class="page"><h1>Kaupapa <span class="muted small">Topics</span></h1>' +
 			'<p class="muted">Your learning path. New words come from the first unfinished topic, or tap a topic to focus on it.</p><div class="path">';
-		TOPICS.forEach(function (t, i) {
-			var c = counts(t.cards);
-			var pct = c.total ? (c.seen + c.solid) / (2 * c.total) : 0;
-			var done = c.solid === c.total;
-			html += '<button class="node' + (done ? " done" : c.seen ? " started" : "") + (i % 2 ? " right" : "") + '" data-action="topic" data-topic="' + t.id + '">' +
-				'<span class="node-ring" style="--p:' + Math.round(pct * 100) + '"><span class="node-icon">' + t.icon + "</span></span>" +
-				'<span class="node-text"><strong>' + esc(t.mi) + "</strong><span>" + esc(t.en) + "</span>" +
-				'<small>' + c.seen + "/" + c.total + " introduced · " + c.solid + " learned</small></span></button>";
-		});
-		html += "</div></main>";
+		path.forEach(function (t, i) { html += topicNode(t, i); });
+		html += "</div>";
+		if (kupu.length) {
+			html += '<h2 class="section-title">Kupu <span class="muted small">Common words · from Tākaro!</span></h2>' +
+				'<p class="muted small">Word sets from the Tākaro! game\'s reference cards. Tap one and choose "Study this topic".</p><div class="path">';
+			kupu.forEach(function (t, i) { html += topicNode(t, i); });
+			html += "</div>";
+		}
+		html += "</main>";
 		return html;
 	}
 
@@ -705,6 +718,7 @@
 		var fresh = newCards(id).length;
 		var html = '<main class="page"><button class="back" data-action="back">‹ Topics</button>' +
 			'<h1>' + t.icon + " " + esc(t.mi) + ' <span class="muted small">' + esc(t.en) + "</span></h1>" +
+			(t.source ? '<p class="source small">Source: ' + esc(t.source) + "</p>" : "") +
 			'<p class="muted">' + c.seen + "/" + c.total + " introduced · " + c.solid + " learned · " + c.mastered + " mastered</p>" +
 			'<div class="btn-row">' +
 			((due || fresh) ? '<button class="btn primary" data-action="start" data-mode="topic" data-topic="' + id + '">Study this topic</button>' : "") +
@@ -713,6 +727,7 @@
 		t.cards.forEach(function (card) {
 			var st = cardStatus(card);
 			html += '<li class="word ' + st + '"><span class="status-dot" title="' + st + '"></span>' +
+				(card.pic ? '<span class="word-pic">' + card.pic + "</span>" : "") +
 				'<div class="word-main"><span class="word-mi">' + (st === "new" ? '<span class="muted">' + blanks(card.mi) + "</span>" : blanks(card.mi)) + "</span>" +
 				'<span class="word-en">' + blanks(card.en) + "</span></div>" +
 				'<a class="teaka" href="' + teAkaUrl(card) + '" target="_blank" rel="noopener" title="Look up in Te Aka">Te Aka ↗</a></li>';
@@ -815,6 +830,7 @@
 
 	function detailBlock(card) {
 		var html = '<div class="detail">';
+		if (card.pic && !(session && session.current && session.current.ex === "intro")) html += '<div class="pic small-pic" aria-hidden="true">' + card.pic + "</div>";
 		if (card.note) html += '<p class="note">' + esc(card.note) + "</p>";
 		if (card.ex) html += '<p class="ex"><b>' + esc(card.ex) + "</b><br><span class=\"muted\">" + esc(card.exEn) + "</span></p>";
 		html += '<a class="teaka" href="' + teAkaUrl(card) + '" target="_blank" rel="noopener">Look up “' + esc(card.lookup) + '” in Te Aka ↗</a></div>';
@@ -830,6 +846,7 @@
 
 		if (cur.ex === "intro") {
 			html += tag + '<div class="s-kicker new-kicker">✨ New word</div>' +
+				(card.pic ? '<div class="pic" aria-hidden="true">' + card.pic + "</div>" : "") +
 				'<div class="big-word">' + blanks(card.mi) + "</div>" +
 				'<div class="big-en">' + blanks(card.en) + "</div>" + detailBlock(card) +
 				'<div class="s-foot"><button class="btn primary big" data-action="intro-ok">Got it</button></div>';
