@@ -452,3 +452,22 @@ summary { cursor: pointer; color: var(--brand-text); font-weight: 600; padding: 
 .ic { display: inline-flex; align-items: center; justify-content: center; vertical-align: -6px; width: 26px; height: 26px; border-radius: 7px; background: var(--surface-2); margin: 0 2px; }
 .ic svg { width: 17px; height: 17px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .onboard #install-now[hidden] { display: none; }
+
+/* ---------- how to say it (syllables) ---------- */
+.info-btn {
+	font: inherit; font-size: .95rem; line-height: 1; font-weight: 700;
+	width: 26px; height: 26px; border-radius: 50%;
+	border: 1.5px solid var(--brand-text); background: transparent; color: var(--brand-text);
+	cursor: pointer; vertical-align: middle; padding: 0;
+}
+.info-btn.on { background: var(--brand); border-color: var(--brand); color: var(--brand-ink); }
+.big-word .info-btn { width: 30px; height: 30px; font-size: 1.05rem; margin-left: 6px; vertical-align: 6px; }
+.sayit-row { margin: 8px 0 2px; }
+.sayit { display: inline-flex; align-items: center; gap: 8px; }
+.sayit-label { font-size: .88rem; font-weight: 600; color: var(--brand-text); }
+.syll { background: var(--surface-2); border-radius: 12px; padding: 10px 14px; margin: 6px 0; }
+.syll-word { font-size: 1.35rem; font-weight: 700; letter-spacing: .02em; }
+.syll-tips { margin: 6px 0 0; padding-left: 1.1em; font-size: .88rem; }
+.syll-vowels { font-size: .8rem; color: var(--muted); margin-top: 6px; }
+.word-mi .syll { font-weight: 400; }
+.word-mi .info-btn { width: 22px; height: 22px; font-size: .8rem; }
