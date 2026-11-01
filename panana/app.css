@@ -417,3 +417,5 @@ summary { cursor: pointer; color: var(--brand-text); font-weight: 600; padding: 
 .small-bar { height: 8px; }
 .path.locked .node { opacity: .55; }
 .proverb.tip { border-left-color: var(--brand); }
+.time-select { font: inherit; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); color: var(--text); }
+.mistakes-card .standing-icon { font-size: 1.6rem; }

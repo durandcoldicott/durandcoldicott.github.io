@@ -10,6 +10,8 @@
  *   reo:progress:<username>  { state, savedAt }  + metadata = leaderboard summary
  *   reo:fail:<ip>            failed login / invite attempts (expires after 15 min)
  *   reo:config               { invite, closed, max } — admin overrides set from the app
+ *   reo:vapid                push-notification signing keys (made on first use)
+ *   reo:push:<username>      { subs: [push subscriptions], time, tz, streak, weekly, last… }
  *
  * Configuration (set as *Secrets* in the Cloudflare dashboard so a
  * `wrangler deploy` doesn't wipe them):
@@ -206,6 +208,9 @@ function cleanSummary(s) {
 		lm: date(s.lm),
 		lr: num(s.lr),
 		la: date(s.la),
+		dk: date(s.dk),
+		dr: num(s.dr),
+		g: num(s.g),
 		h: !!s.h,
 	};
 }
@@ -407,6 +412,289 @@ async function adminConfig(request, env, session) {
 	return json({ config: { invite: inviteCode(env, config), closed: !!config.closed, max: maxMembers(config) } });
 }
 
+
+// ---------------------------------------------------------------------------
+// Push notifications (Web Push: RFC 8291 encryption + RFC 8292 VAPID), all
+// with WebCrypto — no libraries. Signing keys are made on first use and kept
+// in KV, so there's nothing to configure.
+// ---------------------------------------------------------------------------
+const enc = new TextEncoder();
+function b64u(bytes) { return b64(bytes).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); }
+function unb64u(str) {
+	str = String(str).replace(/-/g, "+").replace(/_/g, "/");
+	while (str.length % 4) str += "=";
+	return unb64(str);
+}
+function concatBytes(...arrs) {
+	const out = new Uint8Array(arrs.reduce((n, a) => n + a.length, 0));
+	let o = 0;
+	for (const a of arrs) { out.set(a, o); o += a.length; }
+	return out;
+}
+
+// only send to the real browser push services
+const PUSH_HOSTS = [/\.googleapis\.com$/, /\.mozilla\.com$/, /\.push\.apple\.com$/, /\.notify\.windows\.com$/];
+function validSubscription(sub) {
+	try {
+		const u = new URL(sub.endpoint);
+		return u.protocol === "https:" && PUSH_HOSTS.some((re) => re.test(u.hostname)) &&
+			unb64u(sub.keys.p256dh).length === 65 && unb64u(sub.keys.auth).length === 16;
+	} catch (e) {
+		return false;
+	}
+}
+
+async function getVapid(kv) {
+	let v = await kv.get(P + "vapid", "json");
+	if (v) return v;
+	const pair = await crypto.subtle.generateKey({ name: "ECDSA", namedCurve: "P-256" }, true, ["sign", "verify"]);
+	const pub = new Uint8Array(await crypto.subtle.exportKey("raw", pair.publicKey));
+	v = { publicKey: b64u(pub), privateJwk: await crypto.subtle.exportKey("jwk", pair.privateKey) };
+	await kv.put(P + "vapid", JSON.stringify(v));
+	return v;
+}
+
+async function vapidAuth(vapid, endpoint) {
+	const header = b64u(enc.encode(JSON.stringify({ typ: "JWT", alg: "ES256" })));
+	const claims = b64u(enc.encode(JSON.stringify({
+		aud: new URL(endpoint).origin,
+		exp: Math.floor(Date.now() / 1000) + 12 * 3600,
+		sub: "https://durand.nz/panana",
+	})));
+	const key = await crypto.subtle.importKey("jwk", vapid.privateJwk, { name: "ECDSA", namedCurve: "P-256" }, false, ["sign"]);
+	const sig = new Uint8Array(await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, key, enc.encode(header + "." + claims)));
+	return "vapid t=" + header + "." + claims + "." + b64u(sig) + ", k=" + vapid.publicKey;
+}
+
+async function hkdf(salt, ikm, info, length) {
+	const key = await crypto.subtle.importKey("raw", ikm, "HKDF", false, ["deriveBits"]);
+	return new Uint8Array(await crypto.subtle.deriveBits({ name: "HKDF", hash: "SHA-256", salt, info }, key, length * 8));
+}
+
+// RFC 8291: aes128gcm-encrypt a payload for one subscription
+async function encryptPayload(sub, text) {
+	const uaPublic = unb64u(sub.keys.p256dh);
+	const authSecret = unb64u(sub.keys.auth);
+	const as = await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, ["deriveBits"]);
+	const asPublic = new Uint8Array(await crypto.subtle.exportKey("raw", as.publicKey));
+	const uaKey = await crypto.subtle.importKey("raw", uaPublic, { name: "ECDH", namedCurve: "P-256" }, false, []);
+	const shared = new Uint8Array(await crypto.subtle.deriveBits({ name: "ECDH", public: uaKey }, as.privateKey, 256));
+	const ikm = await hkdf(authSecret, shared, concatBytes(enc.encode("WebPush: info\0"), uaPublic, asPublic), 32);
+	const salt = crypto.getRandomValues(new Uint8Array(16));
+	const cek = await hkdf(salt, ikm, enc.encode("Content-Encoding: aes128gcm\0"), 16);
+	const nonce = await hkdf(salt, ikm, enc.encode("Content-Encoding: nonce\0"), 12);
+	const aes = await crypto.subtle.importKey("raw", cek, "AES-GCM", false, ["encrypt"]);
+	const cipher = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv: nonce }, aes,
+		concatBytes(enc.encode(text), new Uint8Array([2]))));
+	const header = new Uint8Array(16 + 4 + 1 + 65);
+	header.set(salt, 0);
+	new DataView(header.buffer).setUint32(16, 4096);
+	header[20] = 65;
+	header.set(asPublic, 21);
+	return concatBytes(header, cipher);
+}
+
+async function sendPush(vapid, sub, data) {
+	const body = await encryptPayload(sub, JSON.stringify(data));
+	const res = await fetch(sub.endpoint, {
+		method: "POST",
+		headers: {
+			Authorization: await vapidAuth(vapid, sub.endpoint),
+			"Content-Encoding": "aes128gcm",
+			"Content-Type": "application/octet-stream",
+			TTL: "43200",
+			Urgency: "normal",
+		},
+		body,
+	});
+	return res.status;
+}
+
+// Send to every device a member has subscribed; drop subscriptions the push
+// service says are gone. Returns how many went through.
+async function sendToMember(kv, vapid, key, rec, data) {
+	let ok = 0;
+	const keep = [];
+	for (const sub of rec.subs || []) {
+		let status = 0;
+		try { status = await sendPush(vapid, sub, data); } catch (e) { status = 0; }
+		if (status === 404 || status === 410) continue;
+		keep.push(sub);
+		if (status >= 200 && status < 300) ok++;
+	}
+	rec.subs = keep;
+	return ok;
+}
+
+function cleanTime(t) {
+	const m = /^(\d{1,2}):(\d{2})$/.exec(String(t || ""));
+	if (!m) return "19:30";
+	const h = Math.min(23, +m[1]), mm = Math.min(45, Math.floor(+m[2] / 15) * 15);
+	return String(h).padStart(2, "0") + ":" + String(mm).padStart(2, "0");
+}
+function cleanTz(tz) {
+	try { new Intl.DateTimeFormat("en", { timeZone: tz }); return tz; } catch (e) { return "Pacific/Auckland"; }
+}
+
+async function pushKey(env) {
+	return json({ publicKey: (await getVapid(kvOf(env))).publicKey });
+}
+
+async function pushStatus(env, session) {
+	const rec = await kvOf(env).get(P + "push:" + session.u, "json");
+	if (!rec || !(rec.subs || []).length) return json({ subscribed: false });
+	return json({ subscribed: true, devices: rec.subs.length, time: rec.time, tz: rec.tz, streak: !!rec.streak, weekly: !!rec.weekly });
+}
+
+async function pushSubscribe(request, env, session) {
+	const body = await readBody(request);
+	if (!body || !body.subscription || !validSubscription(body.subscription)) return json({ error: "That device can't receive notifications." }, 400);
+	const kv = kvOf(env);
+	const key = P + "push:" + session.u;
+	const rec = (await kv.get(key, "json")) || { subs: [] };
+	const sub = { endpoint: body.subscription.endpoint, keys: { p256dh: body.subscription.keys.p256dh, auth: body.subscription.keys.auth } };
+	rec.subs = [sub].concat((rec.subs || []).filter((s) => s.endpoint !== sub.endpoint)).slice(0, 3);
+	rec.name = session.n;
+	rec.time = cleanTime(body.time || rec.time);
+	rec.tz = cleanTz(body.tz || rec.tz);
+	rec.streak = body.streak !== undefined ? !!body.streak : !!rec.streak;
+	rec.weekly = body.weekly !== undefined ? !!body.weekly : !!rec.weekly;
+	await kv.put(key, JSON.stringify(rec));
+	return json({ ok: true });
+}
+
+async function pushPrefs(request, env, session) {
+	const body = await readBody(request);
+	if (!body) return json({ error: "Invalid request." }, 400);
+	const kv = kvOf(env);
+	const key = P + "push:" + session.u;
+	const rec = await kv.get(key, "json");
+	if (!rec) return json({ error: "Reminders aren't on." }, 400);
+	if (body.time !== undefined) rec.time = cleanTime(body.time);
+	if (body.tz) rec.tz = cleanTz(body.tz);
+	if (body.streak !== undefined) rec.streak = !!body.streak;
+	if (body.weekly !== undefined) rec.weekly = !!body.weekly;
+	await kv.put(key, JSON.stringify(rec));
+	return json({ ok: true });
+}
+
+async function pushUnsubscribe(request, env, session) {
+	const body = (await readBody(request)) || {};
+	const kv = kvOf(env);
+	const key = P + "push:" + session.u;
+	const rec = await kv.get(key, "json");
+	if (rec) {
+		rec.subs = body.endpoint ? (rec.subs || []).filter((s) => s.endpoint !== body.endpoint) : [];
+		if (rec.subs.length) await kv.put(key, JSON.stringify(rec));
+		else await kv.delete(key);
+	}
+	return json({ ok: true });
+}
+
+async function pushTest(env, session) {
+	const kv = kvOf(env);
+	const key = P + "push:" + session.u;
+	const rec = await kv.get(key, "json");
+	if (!rec || !(rec.subs || []).length) return json({ error: "Turn reminders on first." }, 400);
+	const sent = await sendToMember(kv, await getVapid(kv), key, rec,
+		{ title: "🍌 Kia ora " + firstName(session.n) + "!", body: "Notifications are working. Ka pai!", tag: "panana-test" });
+	await kv.put(key, JSON.stringify(rec));
+	return json({ ok: sent > 0, sent });
+}
+
+function firstName(n) { return String(n || "").split(" ")[0] || "e hoa"; }
+
+// local date/time for a timezone, as { date: "YYYY-MM-DD", minutes, weekday (0 Sun) }
+function localNow(tz, ms) {
+	const parts = {};
+	new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23", weekday: "short" })
+		.formatToParts(new Date(ms)).forEach((p) => { parts[p.type] = p.value; });
+	const days = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+	return { date: parts.year + "-" + parts.month + "-" + parts.day, minutes: (+parts.hour % 24) * 60 + +parts.minute, weekday: days[parts.weekday] };
+}
+function shiftDate(key, n) {
+	const [y, m, d] = key.split("-").map(Number);
+	return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
+}
+function weekStartOf(key) {
+	const [y, m, d] = key.split("-").map(Number);
+	const dow = (new Date(Date.UTC(y, m - 1, d)).getUTCDay() + 6) % 7;
+	return shiftDate(key, -dow);
+}
+function inWindow(minutes, hhmm) {
+	const [h, m] = hhmm.split(":").map(Number);
+	const t = h * 60 + m;
+	return minutes >= t && minutes < t + 15;
+}
+
+// Runs every 15 minutes (wrangler.toml [triggers]). Sends each member at most
+// one daily reminder (only if their goal isn't met), an optional 9pm
+// streak-at-risk nudge, and an optional Monday 9am league result.
+export async function runReminders(env, nowMs = Date.now()) {
+	const kv = kvOf(env);
+	if (!kv) return { sent: 0 };
+	const subs = await listAll(kv, P + "push:");
+	if (!subs.length) return { sent: 0 };
+	let meta = null, vapid = null, sent = 0;
+	for (const k of subs) {
+		const rec = await kv.get(k.name, "json");
+		if (!rec || !(rec.subs || []).length) continue;
+		const u = k.name.slice((P + "push:").length);
+		const L = localNow(rec.tz || "Pacific/Auckland", nowMs);
+		const wants = [];
+		if (inWindow(L.minutes, rec.time || "19:30") && rec.lastDaily !== L.date) wants.push("daily");
+		if (rec.streak && inWindow(L.minutes, "21:00") && rec.lastStreak !== L.date) wants.push("streak");
+		if (rec.weekly && L.weekday === 1 && inWindow(L.minutes, "09:00") && rec.lastWeekly !== L.date) wants.push("weekly");
+		if (!wants.length) continue;
+		if (!meta) {
+			meta = {};
+			(await listAll(kv, P + "progress:")).forEach((x) => { if (x.metadata) meta[x.metadata.u] = x.metadata; });
+			vapid = await getVapid(kv);
+		}
+		const m = meta[u] || {};
+		const metToday = m.lm === L.date;
+		const streakAlive = m.lm === shiftDate(L.date, -1) && m.st > 0;
+		const goal = m.g || 10;
+		const doneToday = m.dk === L.date ? m.dr || 0 : 0;
+		const name = firstName(rec.name || m.n);
+		for (const w of wants) {
+			let data = null;
+			if (w === "daily") {
+				rec.lastDaily = L.date;
+				if (!metToday) {
+					const left = Math.max(1, goal - doneToday);
+					data = { title: "🍌 Kia ora " + name + "!", tag: "panana-daily",
+						body: streakAlive ? plural(left, "more answer") + " keeps your " + m.st + "-day streak going 🔥"
+							: doneToday ? plural(left, "more answer") + " to reach today's goal." : "A few minutes of te reo today? Your goal is " + goal + " answers." };
+				}
+			} else if (w === "streak") {
+				rec.lastStreak = L.date;
+				if (!metToday && streakAlive) data = { title: "🔥 Streak at risk", tag: "panana-streak", body: "Your " + m.st + "-day streak ends at midnight. A quick lesson saves it!" };
+			} else if (w === "weekly") {
+				rec.lastWeekly = L.date;
+				const wk = weekStartOf(L.date), prev = shiftDate(wk, -7);
+				const rows = Object.values(meta).filter((e) => !e.h || e.u === u)
+					.map((e) => ({ u: e.u, n: e.n || e.u, last: e.wk === wk ? e.px : e.wk === prev ? e.wx : 0 }))
+					.filter((r) => r.last > 0).sort((a, b) => b.last - a.last);
+				if (rows.length) {
+					const me = rows.findIndex((r) => r.u === u);
+					data = { title: "🏆 Last week's league", tag: "panana-weekly",
+						body: rows[0].u === u ? "You topped the group with " + rows[0].last + " XP. Tino pai!"
+							: firstName(rows[0].n) + " won with " + rows[0].last + " XP." + (me >= 0 ? " You came #" + (me + 1) + "." : "") };
+				}
+			}
+			if (data) sent += await sendToMember(kv, vapid, k.name, rec, Object.assign({ url: "/panana/" }, data));
+		}
+		if (rec.subs.length) await kv.put(k.name, JSON.stringify(rec));
+		else await kv.delete(k.name);
+	}
+	return { sent };
+}
+function plural(n, word) { return n + " " + word + (n === 1 ? "" : "s"); }
+
+// exposed for tests
+export const _push = { encryptPayload, vapidAuth, getVapid, localNow, weekStartOf, validSubscription };
+
 async function handleApi(request, env, path) {
 	const m = request.method;
 	if (m === "POST" && path === "register") return register(request, env);
@@ -425,6 +713,12 @@ async function handleApi(request, env, path) {
 	if (m === "GET" && path === "admin/members") return adminMembers(env, session);
 	if (m === "POST" && path === "admin/remove") return adminRemove(request, env, session);
 	if (m === "POST" && path === "admin/config") return adminConfig(request, env, session);
+	if (m === "GET" && path === "push/key") return pushKey(env);
+	if (m === "GET" && path === "push/status") return pushStatus(env, session);
+	if (m === "POST" && path === "push/subscribe") return pushSubscribe(request, env, session);
+	if (m === "POST" && path === "push/prefs") return pushPrefs(request, env, session);
+	if (m === "POST" && path === "push/unsubscribe") return pushUnsubscribe(request, env, session);
+	if (m === "POST" && path === "push/test") return pushTest(env, session);
 	return json({ error: "Not found." }, 404);
 }
 

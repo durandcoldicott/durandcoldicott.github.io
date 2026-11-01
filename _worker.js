@@ -1,5 +1,5 @@
 import { KNOWLEDGE_BASE } from "./data/knowledge-base.js";
-import { handlePanana } from "./worker/panana.js";
+import { handlePanana, runReminders } from "./worker/panana.js";
 
 const MODEL = "claude-haiku-4-5";
 const MAX_INPUT_CHARS = 500;
@@ -131,6 +131,11 @@ async function handleChat(request, env, systemPrompt, notConfiguredMessage) {
 }
 
 export default {
+	// every 15 minutes (wrangler.toml [triggers]): Panana practice reminders
+	async scheduled(event, env, ctx) {
+		ctx.waitUntil(runReminders(env));
+	},
+
 	async fetch(request, env, ctx) {
 		const url = new URL(request.url);
 

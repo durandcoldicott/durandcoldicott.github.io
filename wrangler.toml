@@ -10,6 +10,10 @@ binding = "ASSETS"
 # /reo is its old address, which the Worker redirects.
 run_worker_first = ["/panana", "/panana/*", "/reo", "/reo/*"]
 
+# Panana practice reminders (push notifications) are checked every 15 minutes.
+[triggers]
+crons = ["*/15 * * * *"]
+
 [[kv_namespaces]]
 binding = "RATE_LIMIT_KV"
 id = "f19f1acb96f440ee9e2361c34a2eaa27"
