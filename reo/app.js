@@ -276,6 +276,7 @@
 		{ id: "tta", icon: "🔺", mi: "Tau, Tae, Āhua", en: "Know all the Tākaro! numbers, colours and shapes", test: function () { return topicKnown("tta"); } },
 		{ id: "bits", icon: "🛋️", mi: "Ngā Taputapu", en: "Know all the Tākaro! Bits + Bobs words", test: function () { return topicKnown("bits"); } },
 		{ id: "orig", icon: "🥝", mi: "Kupu Taketake", en: "Know all the Tākaro! Original words", test: function () { return topicKnown("orig"); } },
+		{ id: "wild", icon: "🐋", mi: "Te Taiao", en: "Know all the Tākaro! Into the Wild words", test: function () { return topicKnown("wild"); } },
 		{ id: "words25", icon: "📗", mi: "Rua tekau mā rima", en: "25 words learned", test: function () { return solidCount() >= 25; } },
 		{ id: "words100", icon: "📚", mi: "Kotahi rau", en: "100 words learned", test: function () { return solidCount() >= 100; } },
 		{ id: "perfect", icon: "💎", mi: "Tika rawa", en: "A perfect lesson (10+ answers, no mistakes)", test: function () { return state.stats.perfect >= 1; } },
