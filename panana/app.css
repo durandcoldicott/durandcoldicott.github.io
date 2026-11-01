@@ -272,8 +272,8 @@ body.in-session { background: var(--surface); }
 	padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
 	max-height: 70dvh; overflow-y: auto;
 	box-shadow: 0 -8px 28px rgba(0,0,0,.18);
-	animation: slideup .22s ease;
 }
+.feedback.anim { animation: slideup .22s ease; }
 .fb-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .fb-top .teaka { font-size: .85rem; }
 .fb-answer { display: flex; align-items: center; gap: 10px; font-size: 1.05rem; }
@@ -419,3 +419,14 @@ summary { cursor: pointer; color: var(--brand-text); font-weight: 600; padding: 
 .proverb.tip { border-left-color: var(--brand); }
 .time-select { font: inherit; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); color: var(--text); }
 .mistakes-card .standing-icon { font-size: 1.6rem; }
+
+/* ---------- feedback ---------- */
+.mini-form textarea { font: inherit; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--text); width: 100%; resize: vertical; }
+.mini-form textarea:focus { outline: none; border-color: var(--brand); }
+.link-btn { font: inherit; font-size: .85rem; background: none; border: 0; color: var(--muted); padding: 8px 0 0; cursor: pointer; text-decoration: underline; }
+.report-form { margin-top: 8px; }
+.report-form .btn-row { margin: 4px 0 0; }
+.fb-list .member { align-items: flex-start; }
+.fb-list .member.done { opacity: .55; }
+.fb-msg-text { margin: 4px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.btn-row.tight { margin: 4px 0 0; gap: 6px; }

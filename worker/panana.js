@@ -12,6 +12,7 @@
  *   reo:config               { invite, closed, max } — admin overrides set from the app
  *   reo:vapid                push-notification signing keys (made on first use)
  *   reo:push:<username>      { subs: [push subscriptions], time, tz, streak, weekly, last… }
+ *   reo:fb:<time>-<random>   feedback / corrections from members (+ metadata for the admin list)
  *
  * Configuration (set as *Secrets* in the Cloudflare dashboard so a
  * `wrangler deploy` doesn't wipe them):
@@ -695,6 +696,71 @@ function plural(n, word) { return n + " " + word + (n === 1 ? "" : "s"); }
 // exposed for tests
 export const _push = { encryptPayload, vapidAuth, getVapid, localNow, weekStartOf, validSubscription };
 
+
+// ---------------------------------------------------------------------------
+// Feedback & corrections: any member can send; admins read and resolve.
+// ---------------------------------------------------------------------------
+const FB_KINDS = { correction: 1, bug: 1, idea: 1 };
+const FB_MAX_PER_DAY = 20;
+
+function cleanText(s, max) {
+	return typeof s === "string" ? s.replace(/[\u0000-\u0008\u000b-\u001f]/g, "").trim().slice(0, max) : "";
+}
+
+async function sendFeedback(request, env, session) {
+	const body = await readBody(request);
+	if (!body) return json({ error: "Invalid request." }, 400);
+	const message = cleanText(body.message, 1000);
+	if (message.length < 3) return json({ error: "Tell us a little more first." }, 400);
+	const kind = FB_KINDS[body.kind] ? body.kind : "correction";
+	const kv = kvOf(env);
+	const countKey = P + "fbcount:" + session.u + ":" + new Date().toISOString().slice(0, 10);
+	const count = parseInt((await kv.get(countKey)) || "0", 10);
+	if (count >= FB_MAX_PER_DAY) return json({ error: "That's a lot of reports for one day — thank you! Try again tomorrow." }, 429);
+	await kv.put(countKey, String(count + 1), { expirationTtl: 172800 });
+	const at = new Date().toISOString();
+	const id = Date.now().toString(36) + "-" + hex(crypto.getRandomValues(new Uint8Array(4)));
+	const item = { id, u: session.u, n: session.n, kind, message, about: cleanText(body.about, 200), card: cleanText(body.card, 80), at, done: false };
+	await kv.put(P + "fb:" + id, JSON.stringify(item), { metadata: { id, u: item.u, n: item.n, kind, at, done: false, about: item.about.slice(0, 80), preview: message.slice(0, 160) } });
+	// let admins with reminders on know (best effort)
+	try {
+		const vapid = await getVapid(kv);
+		for (const admin of (env.REO_ADMINS || "").split(",").map((x) => x.trim().toLowerCase()).filter(Boolean)) {
+			if (admin === session.u) continue;
+			const key = P + "push:" + admin;
+			const rec = await kv.get(key, "json");
+			if (!rec || !(rec.subs || []).length) continue;
+			await sendToMember(kv, vapid, key, rec, { title: "📝 New " + (kind === "bug" ? "problem report" : kind === "idea" ? "idea" : "correction"),
+				body: firstName(session.n) + ": " + message.slice(0, 120), tag: "panana-feedback", url: "/panana/" });
+			await kv.put(key, JSON.stringify(rec));
+		}
+	} catch (e) {}
+	return json({ ok: true });
+}
+
+async function adminFeedback(env, session) {
+	if (!isAdmin(env, session.u)) return json({ error: "Admins only." }, 403);
+	const kv = kvOf(env);
+	const keys = await listAll(kv, P + "fb:");
+	const items = await Promise.all(keys.map(async (k) => (await kv.get(k.name, "json"))));
+	return json({ items: items.filter(Boolean).sort((a, b) => (a.done - b.done) || b.at.localeCompare(a.at)) });
+}
+
+async function adminFeedbackUpdate(request, env, session) {
+	if (!isAdmin(env, session.u)) return json({ error: "Admins only." }, 403);
+	const body = await readBody(request);
+	const id = String((body && body.id) || "");
+	if (!/^[a-z0-9]+-[a-f0-9]{8}$/.test(id)) return json({ error: "Invalid item." }, 400);
+	const kv = kvOf(env);
+	const key = P + "fb:" + id;
+	const item = await kv.get(key, "json");
+	if (!item) return json({ error: "Not found." }, 404);
+	if (body.action === "delete") { await kv.delete(key); return json({ ok: true }); }
+	item.done = body.action === "done";
+	await kv.put(key, JSON.stringify(item), { metadata: { id, u: item.u, n: item.n, kind: item.kind, at: item.at, done: item.done, about: item.about.slice(0, 80), preview: item.message.slice(0, 160) } });
+	return json({ ok: true });
+}
+
 async function handleApi(request, env, path) {
 	const m = request.method;
 	if (m === "POST" && path === "register") return register(request, env);
@@ -713,6 +779,9 @@ async function handleApi(request, env, path) {
 	if (m === "GET" && path === "admin/members") return adminMembers(env, session);
 	if (m === "POST" && path === "admin/remove") return adminRemove(request, env, session);
 	if (m === "POST" && path === "admin/config") return adminConfig(request, env, session);
+	if (m === "POST" && path === "feedback") return sendFeedback(request, env, session);
+	if (m === "GET" && path === "admin/feedback") return adminFeedback(env, session);
+	if (m === "POST" && path === "admin/feedback") return adminFeedbackUpdate(request, env, session);
 	if (m === "GET" && path === "push/key") return pushKey(env);
 	if (m === "GET" && path === "push/status") return pushStatus(env, session);
 	if (m === "POST" && path === "push/subscribe") return pushSubscribe(request, env, session);

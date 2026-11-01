@@ -1467,6 +1467,7 @@
 			'<section class="card"><div class="toggle-row"><span><b>Sounds</b><br><span class="muted small">Chimes for right answers, goals and achievements' + (navigator.vibrate ? ", plus a little buzz" : "") + '</span></span>' +
 			'<button class="chip' + (s.sound ? " active" : "") + '" data-action="toggle-sound">' + (s.sound ? "On" : "Off") + "</button></div></section>" +
 			renderReminders() +
+			renderFeedbackCard() +
 			'<section class="card"><h2>Daily goal</h2><p class="muted small">Answers per day to keep your streak.</p>' + choice("goal", [5, 10, 20, 30], s.goal) +
 			'<h2>New words per day</h2>' + choice("newPerDay", [3, 5, 8, 12], s.newPerDay) + "</section>" +
 
@@ -1603,12 +1604,15 @@
 	function genFeedback(cur) {
 		var q = cur.q;
 		var msg = cur.correct ? (cur.praise || (cur.praise = pick(["Ka pai!", "Tika!", "Tino pai!", "Ka rawe!"]))) : "Not quite. The answer:";
-		return '<div class="feedback ' + (cur.correct ? "good" : "bad") + '" role="status">' +
+		var anim = cur.fbAnimated ? "" : " anim";
+		cur.fbAnimated = true;
+		return '<div class="feedback ' + (cur.correct ? "good" : "bad") + anim + '" role="status">' +
 			'<div class="fb-top"><div class="fb-msg">' + msg + "</div></div>" +
 			'<div class="fb-answer"><span><b>' + esc(q.ask) + " " + esc(q.answer) + "</b></span></div>" +
 			'<p class="fb-note">' + esc(q.en) + "</p>" +
 			(q.alts && q.alts.length ? '<p class="fb-note">Also correct: ' + esc(q.alts[0]) + "</p>" : "") +
 			(cur.correct ? "" : '<p class="fb-note">Pattern: ' + esc(cur.card.mi) + "</p>") +
+			reportBlock(cur) +
 			'<button class="btn primary big" data-action="next">Continue</button></div>';
 	}
 
@@ -1618,13 +1622,16 @@
 		if (cur.correct && cur.macronSlip) msg = "Almost! Watch the macrons:";
 		else if (cur.correct) msg = cur.praise || (cur.praise = pick(["Ka pai!", "Tika!", "Tino pai!", "Ka rawe!", "Koia kei a koe!"]));
 		else msg = "Not quite. The answer:";
-		return '<div class="feedback ' + (cur.correct ? (cur.macronSlip ? "almost" : "good") : "bad") + '" role="status">' +
+		var anim = cur.fbAnimated ? "" : " anim";
+		cur.fbAnimated = true;
+		return '<div class="feedback ' + (cur.correct ? (cur.macronSlip ? "almost" : "good") : "bad") + anim + '" role="status">' +
 			'<div class="fb-top"><div class="fb-msg">' + msg + "</div>" +
 			'<a class="teaka" href="' + teAkaUrl(card) + '" target="_blank" rel="noopener">Te Aka ↗</a></div>' +
 			'<div class="fb-answer">' + (card.pic ? '<span class="fb-pic" aria-hidden="true">' + card.pic + "</span>" : "") +
 			"<span><b>" + blanks(card.mi) + "</b> — " + blanks(card.en) + "</span></div>" +
 			(card.note ? '<p class="fb-note">' + esc(card.note) + "</p>" : "") +
 			(card.ex ? '<p class="fb-note"><b>' + esc(card.ex) + "</b> — " + esc(card.exEn) + "</p>" : "") +
+			reportBlock(cur) +
 			'<button class="btn primary big" data-action="next">Continue</button></div>';
 	}
 
@@ -1741,6 +1748,13 @@
 				render(true);
 				break;
 			case "logout": logout(); break;
+			case "fb-kind": fbKind = el.getAttribute("data-kind"); render(true); break;
+			case "report-open":
+				session.current.reporting = true; render(true);
+				var ta = root.querySelector("#report-form textarea"); if (ta) ta.focus();
+				break;
+			case "report-cancel": session.current.reporting = false; render(true); break;
+			case "admin-fb": adminFeedbackAction(el.getAttribute("data-id"), el.getAttribute("data-do")); break;
 			case "push-toggle": if (pushInfo && pushInfo.subscribed) pushOff(); else pushOn(); break;
 			case "push-streak": pushPrefs({ streak: !pushInfo.streak }); break;
 			case "push-weekly": pushPrefs({ weekly: !pushInfo.weekly }); break;
@@ -1839,7 +1853,13 @@
 	root.addEventListener("submit", function (e) {
 		e.preventDefault();
 		var form = e.target;
-		if (form.id === "password-form") changePassword(form);
+		if (form.id === "fb-form") {
+			var fd = formData(form);
+			sendFeedback({ kind: fbKind, message: fd.message, about: fd.about || "" }, form);
+		} else if (form.id === "report-form") {
+			var rd = formData(form), ctxR = reportContext(session.current);
+			sendFeedback({ kind: "correction", message: rd.message, about: ctxR.about, card: ctxR.card }, form);
+		} else if (form.id === "password-form") changePassword(form);
 		else if (form.id === "admin-form") adminReset(form);
 		else onType(false);
 	});
@@ -1853,7 +1873,7 @@
 	document.addEventListener("keydown", function (e) {
 		if (!session || session.finished || !session.current) return;
 		var cur = session.current;
-		if (e.key === "Enter" && cur.answered && cur.ex !== "flash") {
+		if (e.key === "Enter" && cur.answered && cur.ex !== "flash" && !cur.reporting) {
 			e.preventDefault();
 			advance();
 		} else if (!cur.answered && (cur.ex === "mc_mi" || cur.ex === "mc_en" || cur.ex === "pic") && /^[1-4]$/.test(e.key)) {
@@ -2066,6 +2086,46 @@
 	}
 
 	// ---------------------------------------------------------------------
+	// Feedback & corrections
+	// ---------------------------------------------------------------------
+	var fbKind = "correction";
+	var FB_KINDS = [["correction", "✏️ A word or answer is wrong"], ["bug", "🐞 Something's not working"], ["idea", "💡 An idea"]];
+
+	function renderFeedbackCard() {
+		return '<section class="card" id="feedback"><h2>💬 Feedback & corrections</h2>' +
+			'<p class="muted small">Spotted a mistake, something broken, or have an idea? Tell us. Tip: you can also tap ⚑ Report after any answer.</p>' +
+			'<div class="choices">' + FB_KINDS.map(function (k) {
+				return '<button class="chip' + (fbKind === k[0] ? " active" : "") + '" data-action="fb-kind" data-kind="' + k[0] + '">' + k[1] + "</button>";
+			}).join("") + "</div>" +
+			'<form id="fb-form" class="mini-form">' +
+			(fbKind === "correction" ? '<input name="about" maxlength="200" placeholder="Which word or question? (e.g. kerepi)">' : "") +
+			'<textarea name="message" maxlength="1000" rows="4" required placeholder="' +
+			(fbKind === "correction" ? "What's wrong, and what should it be?" : fbKind === "bug" ? "What happened, and what did you expect?" : "What would make Panana better?") + '"></textarea>' +
+			'<button class="btn primary" type="submit">Send</button></form></section>';
+	}
+
+	function sendFeedback(data, form) {
+		api("POST", "feedback", data).then(function (r) {
+			if (!r.ok) return toast(r.data.error || "Couldn't send — try again.");
+			toast("Ngā mihi! Thanks for helping improve Panana.");
+			if (form) form.reset();
+			if (session && session.current) { session.current.reporting = false; session.current.reported = true; render(true); }
+		}).catch(function () { toast("Can't reach the server — try again when you're online."); });
+	}
+
+	// what the in-lesson ⚑ Report is about
+	function reportContext(cur) {
+		if (cur.q) return { about: cur.q.ask + " → " + cur.q.answer, card: cur.card.id };
+		return { about: cur.card.mi + " — " + cur.card.en, card: cur.card.id };
+	}
+	function reportBlock(cur) {
+		if (cur.reported) return '<p class="fb-note">⚑ Reported — ngā mihi!</p>';
+		if (!cur.reporting) return '<button class="link-btn" data-action="report-open">⚑ Report a problem</button>';
+		return '<form id="report-form" class="mini-form report-form"><textarea name="message" maxlength="1000" rows="3" required placeholder="What\'s wrong with this question or answer?"></textarea>' +
+			'<div class="btn-row"><button class="btn" type="submit">Send report</button><button class="btn ghost" type="button" data-action="report-cancel">Cancel</button></div></form>';
+	}
+
+	// ---------------------------------------------------------------------
 	// Reminders (push notifications)
 	// ---------------------------------------------------------------------
 	var pushInfo = null;   // server's view: { subscribed, time, streak, weekly }
@@ -2171,7 +2231,40 @@
 	var adminData = null; // { members, config }
 	var adminError = "";
 
+	var adminFb = null;
+	function loadAdminFeedback() {
+		api("GET", "admin/feedback").then(function (r) {
+			if (r.ok) { adminFb = r.data.items; if (!session && view === "more") render(true); }
+		}).catch(function () {});
+	}
+	function adminFeedbackAction(id, what) {
+		if (what === "delete" && !confirm("Delete this report?")) return;
+		api("POST", "admin/feedback", { id: id, action: what }).then(function (r) {
+			if (!r.ok) return toast(r.data.error || "Couldn't update.");
+			loadAdminFeedback();
+		}).catch(function () { toast("Can't reach the server."); });
+	}
+	function renderAdminFeedback() {
+		if (!adminFb) return '<p class="muted small">Loading feedback…</p>';
+		var open = adminFb.filter(function (x) { return !x.done; }).length;
+		var html = '<h3 class="members-title">Feedback <span class="muted small">' + open + " open · " + adminFb.length + " total</span></h3>";
+		if (!adminFb.length) return html + '<p class="muted small">No reports yet.</p>';
+		var label = { correction: "✏️ correction", bug: "🐞 problem", idea: "💡 idea" };
+		html += '<ul class="members fb-list">';
+		adminFb.slice(0, 30).forEach(function (x) {
+			html += '<li class="member' + (x.done ? " done" : "") + '"><div class="member-main">' +
+				'<div class="small"><span class="pill' + (x.kind === "bug" ? " warn" : "") + '">' + (label[x.kind] || x.kind) + "</span> <b>" + esc(x.n || x.u) + '</b> <span class="muted">· ' + esc((x.at || "").slice(0, 10)) + "</span></div>" +
+				(x.about ? '<div class="small muted">About: ' + esc(x.about) + "</div>" : "") +
+				'<div class="fb-msg-text">' + esc(x.message) + "</div>" +
+				'<div class="btn-row tight">' + (x.done ? '<button class="btn danger-sm" data-action="admin-fb" data-do="reopen" data-id="' + esc(x.id) + '">Reopen</button>'
+					: '<button class="btn danger-sm" data-action="admin-fb" data-do="done" data-id="' + esc(x.id) + '">✓ Done</button>') +
+				'<button class="btn danger-sm" data-action="admin-fb" data-do="delete" data-id="' + esc(x.id) + '">Delete</button></div></div></li>';
+		});
+		return html + "</ul>";
+	}
+
 	function loadAdmin() {
+		loadAdminFeedback();
 		api("GET", "admin/members").then(function (r) {
 			if (!r.ok) { adminError = r.data.error || "Couldn't load members."; }
 			else { adminData = r.data; adminError = ""; user.invite = r.data.config.invite; }
@@ -2239,6 +2332,7 @@
 				"</li>";
 		});
 		html += "</ul>";
+		html += renderAdminFeedback();
 		html += '<details><summary>Reset a member\'s password</summary><form id="admin-form" class="mini-form">' +
 			'<input name="username" autocapitalize="none" autocorrect="off" placeholder="Their username" required>' +
 			'<input name="password" type="text" minlength="8" placeholder="New password (8+ characters)" required>' +
