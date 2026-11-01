@@ -52,6 +52,9 @@ const PUBLIC_PAGES = new Set([
 	"/panana/app.css",
 	"/panana/manifest.webmanifest",
 	"/panana/sw.js",
+	"/panana/install",
+	"/panana/install.html",
+	"/panana/install.js",
 ]);
 
 function kvOf(env) {
