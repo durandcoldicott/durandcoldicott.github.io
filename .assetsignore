@@ -1,7 +1,6 @@
 _worker.js
 wrangler.toml
 data/knowledge-base.js
-data/locomo-knowledge-base.js
 functions/
 scripts/
 .claude/
