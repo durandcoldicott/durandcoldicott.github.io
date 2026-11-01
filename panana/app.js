@@ -362,6 +362,60 @@
 		});
 	}
 	function blanks(s) { return esc(s).replace(/_{3,}/g, '<span class="blank">___</span>'); }
+
+	// ---------------------------------------------------------------------
+	// Syllables: Māori spelling is regular, so words split by rule into
+	// (consonant +) vowel units. wh and ng are single consonants; long vowels
+	// stand alone; short-vowel diphthongs (ae, ai, ao, au, oe, oi, ou, ei, eu)
+	// stay together, as in whā·nau and Ao·te·a·ro·a.
+	// ---------------------------------------------------------------------
+	var MI_VOWELS = "aeiouāēīōū", MI_LONG = "āēīōū";
+	var MI_DIPH = { ae: 1, ai: 1, ao: 1, au: 1, oe: 1, oi: 1, ou: 1, ei: 1, eu: 1 };
+	function syllablesOf(word) {
+		var lw = word.toLowerCase();
+		if (!/^[aeiouāēīōūhkmnprtwg]+$/.test(lw)) return null; // not a plain Māori word
+		var out = [], i = 0;
+		while (i < lw.length) {
+			var start = i;
+			if (lw.substr(i, 2) === "wh" || lw.substr(i, 2) === "ng") i += 2;
+			else if (MI_VOWELS.indexOf(lw[i]) === -1) i += 1;
+			if (i < lw.length && MI_VOWELS.indexOf(lw[i]) !== -1) {
+				var v = lw[i];
+				i++;
+				if (MI_LONG.indexOf(v) === -1 && i < lw.length && MI_DIPH[v + lw[i]]) i++;
+			}
+			out.push(word.slice(start, i));
+		}
+		return out;
+	}
+	function syllableText(text) {
+		return text.split(/\s+/).map(function (tok) {
+			var core = tok.replace(/[?!.,;:→]/g, "");
+			if (!core) return "";
+			var sy = syllablesOf(core);
+			return sy ? sy.join(" · ") : core;
+		}).filter(Boolean).join("   ");
+	}
+	function soundTips(text) {
+		var t = text.toLowerCase(), tips = [];
+		if (/wh/.test(t)) tips.push("<b>wh</b> — usually like an f");
+		if (/ng/.test(t)) tips.push("<b>ng</b> — like the ng in singer, even at the start of a word");
+		if (/r/.test(t)) tips.push("<b>r</b> — a soft tap, close to the d in ladder");
+		if (/[āēīōū]/.test(t)) tips.push("<b>ā ē ī ō ū</b> — hold the vowel longer");
+		if (/(ae|ai|ao|au|oe|oi|ou|ei|eu)/.test(t.replace(/[āēīōū]./g, ""))) tips.push("<b>ai, ao, au…</b> — glide the two vowels together");
+		return tips;
+	}
+	var syllSeq = 0;
+	// ⓘ button + hidden panel; label shows beside the button when given
+	function sayIt(text, label) {
+		var id = "say" + (++syllSeq);
+		var tips = soundTips(text);
+		return '<span class="sayit"><button type="button" class="info-btn" data-action="syll" data-target="' + id + '" aria-expanded="false" aria-label="How to say ' + esc(text) + '">ⓘ</button>' +
+			(label ? '<span class="sayit-label">' + label + "</span>" : "") + "</span>" +
+			'<div class="syll" id="' + id + '" hidden><div class="syll-word">' + esc(syllableText(text)) + "</div>" +
+			(tips.length ? '<ul class="syll-tips">' + tips.map(function (x) { return "<li>" + x + "</li>"; }).join("") + "</ul>" : "") +
+			'<div class="syll-vowels">a as in <i>cut</i> · e <i>egg</i> · i <i>eat</i> · o <i>or</i> · u <i>zoo</i></div></div>';
+	}
 	function shuffle(a) {
 		for (var i = a.length - 1; i > 0; i--) {
 			var j = Math.floor(Math.random() * (i + 1));
@@ -1412,7 +1466,7 @@
 			}
 			html += '<li class="word ' + st + '"><span class="status-dot" title="' + st + '"></span>' +
 				(card.pic ? '<span class="word-pic">' + card.pic + "</span>" : card.gen ? '<span class="word-pic">💬</span>' : hasPics ? '<span class="word-pic"></span>' : "") +
-				'<div class="word-main"><span class="word-mi">' + (st === "new" ? '<span class="muted">' + blanks(card.mi) + "</span>" : blanks(card.mi)) + "</span>" +
+				'<div class="word-main"><span class="word-mi">' + (st === "new" ? '<span class="muted">' + blanks(card.mi) + "</span>" : blanks(card.mi)) + (card.gen || card.pattern ? "" : " " + sayIt(card.mi)) + "</span>" +
 				'<span class="word-en">' + blanks(card.en) + "</span></div>" +
 				(card.gen ? "" : '<a class="teaka" href="' + teAkaUrl(card) + '" target="_blank" rel="noopener" title="Look up in Te Aka">Te Aka ↗</a>') + "</li>";
 		});
@@ -1468,7 +1522,8 @@
 		var synced = offline ? "Offline — will sync when you reconnect" : lastSync ? "Synced " + ago(lastSync) : "Not synced yet";
 		var account = '<section class="card"><h2>Kia ora, ' + esc(user ? user.name : "") + '</h2>' +
 			'<p class="muted small">Signed in as @' + esc(user ? user.username : "") + " · " + synced + "</p>" +
-			'<div class="toggle-row"><span>Show me on the group leaderboard</span><button class="chip' + (state.settings.hideFromBoard ? "" : " active") + '" data-action="toggle-board">' + (state.settings.hideFromBoard ? "Hidden" : "Shown") + "</button></div>" +
+			'<div class="toggle-row"><span>Show me on the group leaderboard<br><span class="muted small">On by default. Rather practise privately? Turn it off — you\'ll still see the board, others just won\'t see you. (Group admins can always see member activity.)</span></span>' +
+			'<button class="chip' + (state.settings.hideFromBoard ? "" : " active") + '" data-action="toggle-board">' + (state.settings.hideFromBoard ? "Hidden" : "Shown") + "</button></div>" +
 			'<details><summary>Change password</summary><form id="password-form" class="mini-form">' +
 			'<input name="current" type="password" autocomplete="current-password" placeholder="Current password" required>' +
 			'<input name="next" type="password" autocomplete="new-password" minlength="8" placeholder="New password (8+ characters)" required>' +
@@ -1518,6 +1573,7 @@
 
 	function detailBlock(card) {
 		var html = '<div class="detail">';
+		if (!card.gen && !card.pattern) html += '<div class="sayit-row">' + sayIt(card.mi, "How to say it") + "</div>";
 		if (card.pic && !(session && session.current && session.current.ex === "intro")) html += '<div class="pic small-pic" aria-hidden="true">' + card.pic + "</div>";
 		if (card.note) html += '<p class="note">' + esc(card.note) + "</p>";
 		if (card.ex) html += '<p class="ex"><b>' + esc(card.ex) + "</b><br><span class=\"muted\">" + esc(card.exEn) + "</span></p>";
@@ -1621,6 +1677,7 @@
 		return '<div class="feedback ' + (cur.correct ? "good" : "bad") + anim + '" role="status">' +
 			'<div class="fb-top"><div class="fb-msg">' + msg + "</div></div>" +
 			'<div class="fb-answer"><span><b>' + esc(q.ask) + " " + esc(q.answer) + "</b></span></div>" +
+			'<div class="sayit-row">' + sayIt(q.answer, "How to say the answer") + "</div>" +
 			'<p class="fb-note">' + esc(q.en) + "</p>" +
 			(q.alts && q.alts.length ? '<p class="fb-note">Also correct: ' + esc(q.alts[0]) + "</p>" : "") +
 			(cur.correct ? "" : '<p class="fb-note">Pattern: ' + esc(cur.card.mi) + "</p>") +
@@ -1639,6 +1696,7 @@
 		return '<div class="feedback ' + (cur.correct ? (cur.macronSlip ? "almost" : "good") : "bad") + anim + '" role="status">' +
 			'<div class="fb-top"><div class="fb-msg">' + msg + "</div>" +
 			'<a class="teaka" href="' + teAkaUrl(card) + '" target="_blank" rel="noopener">Te Aka ↗</a></div>' +
+			(card.pattern ? "" : '<div class="sayit-row fb-say">' + sayIt(card.mi, "How to say it") + "</div>") +
 			'<div class="fb-answer">' + (card.pic ? '<span class="fb-pic" aria-hidden="true">' + card.pic + "</span>" : "") +
 			"<span><b>" + blanks(card.mi) + "</b> — " + blanks(card.en) + "</span></div>" +
 			(card.note ? '<p class="fb-note">' + esc(card.note) + "</p>" : "") +
@@ -1760,6 +1818,11 @@
 				render(true);
 				break;
 			case "logout": logout(); break;
+			case "syll": {
+				var panel = document.getElementById(el.getAttribute("data-target"));
+				if (panel) { panel.hidden = !panel.hidden; el.setAttribute("aria-expanded", String(!panel.hidden)); el.classList.toggle("on", !panel.hidden); }
+				break;
+			}
 			case "strip-dismiss":
 				try { localStorage.setItem(STRIP_KEY, "1"); } catch (e) {}
 				var stripEl = root.querySelector(".install-strip"); if (stripEl) stripEl.remove();
@@ -2466,7 +2529,9 @@
 				html += '<p class="muted small center">The weekly league resets on Monday · ' + (left === 1 ? "last day!" : left + " days left") + "</p>";
 			}
 		}
-		if (state.settings.hideFromBoard) html += '<p class="muted small center">You\'re hidden from others (change in More).</p>';
+		html += state.settings.hideFromBoard
+			? '<p class="muted small center">🙈 You\'re hidden from the board — others can\'t see you. <button class="link-btn" data-action="toggle-board">Show me again</button></p>'
+			: '<p class="muted small center">Rather practise privately? <button class="link-btn" data-action="toggle-board">Hide me from the board</button></p>';
 		html += "</main>";
 		return html;
 	}
@@ -2523,5 +2588,5 @@
 	}
 
 	// test hook
-	window.__reo = { state: function () { return state; }, mistakes: function () { return mistakeCards().map(function (c) { return c.id; }); }, lastSound: function () { return sfx.last; }, generate: function (id) { return generate(CARD_BY_ID[id]); }, genAvailable: function (id) { return genAvailable(CARD_BY_ID[id]); }, pickExercise: function (id, item) { return pickExercise(CARD_BY_ID[id], item || { kind: "review" }); }, distractors: function (id, f) { return distractors(CARD_BY_ID[id], f); }, mergeStates: mergeStates, summary: summary, pushNow: pushNow, CARDS: CARDS, schedule: schedule, addDays: addDays, currentStreak: currentStreak };
+	window.__reo = { state: function () { return state; }, syllables: syllableText, mistakes: function () { return mistakeCards().map(function (c) { return c.id; }); }, lastSound: function () { return sfx.last; }, generate: function (id) { return generate(CARD_BY_ID[id]); }, genAvailable: function (id) { return genAvailable(CARD_BY_ID[id]); }, pickExercise: function (id, item) { return pickExercise(CARD_BY_ID[id], item || { kind: "review" }); }, distractors: function (id, f) { return distractors(CARD_BY_ID[id], f); }, mergeStates: mergeStates, summary: summary, pushNow: pushNow, CARDS: CARDS, schedule: schedule, addDays: addDays, currentStreak: currentStreak };
 })();
