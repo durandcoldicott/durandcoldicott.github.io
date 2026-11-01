@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+	<meta name="color-scheme" content="light dark" />
+	<meta name="robots" content="noindex, nofollow" />
+	<title>Reo — sign in</title>
+	<meta name="theme-color" content="#1f7a5a" />
+	<meta name="apple-mobile-web-app-capable" content="yes" />
+	<meta name="apple-mobile-web-app-title" content="Reo" />
+	<link rel="manifest" href="/reo/manifest.webmanifest" />
+	<link rel="icon" href="/reo/icons/icon.svg" type="image/svg+xml" />
+	<link rel="apple-touch-icon" href="/reo/icons/apple-touch-icon.png" />
+	<link rel="stylesheet" href="/reo/app.css" />
+</head>
+<body class="auth-page">
+	<main class="auth">
+		<img class="auth-logo" src="/reo/icons/icon.svg" alt="" width="72" height="72" />
+		<h1>Reo</h1>
+		<p class="muted">Te reo Māori practice for our group.</p>
+
+		<div class="auth-tabs" role="tablist">
+			<button class="chip active" data-tab="login" role="tab">Sign in</button>
+			<button class="chip" data-tab="join" role="tab">Join</button>
+		</div>
+
+		<form id="login-form" class="card auth-form" autocomplete="on">
+			<label>Username<input name="username" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required /></label>
+			<label>Password<input name="password" type="password" autocomplete="current-password" required /></label>
+			<p class="auth-error" role="alert"></p>
+			<button class="btn primary big" type="submit">Sign in</button>
+		</form>
+
+		<form id="join-form" class="card auth-form" autocomplete="on" hidden>
+			<label>Invite code<input name="invite" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" required /></label>
+			<label>Your name <span class="muted small">(shown on the leaderboard)</span><input name="name" autocomplete="nickname" maxlength="30" required /></label>
+			<label>Username<input name="username" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" pattern="[a-z0-9_\-]{3,20}" title="3–20 lowercase letters, numbers, - or _" required /></label>
+			<label>Password <span class="muted small">(8+ characters)</span><input name="password" type="password" autocomplete="new-password" minlength="8" required /></label>
+			<p class="auth-error" role="alert"></p>
+			<button class="btn primary big" type="submit">Create account</button>
+		</form>
+
+		<p class="muted small center">Ask the group organiser for an invite code.<br>Forgot your password? They can reset it for you.</p>
+	</main>
+	<script src="/reo/login.js"></script>
+</body>
+</html>

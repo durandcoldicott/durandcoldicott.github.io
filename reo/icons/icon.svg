@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+	<rect width="512" height="512" rx="0" fill="#1f7a5a"/>
+	<!-- a koru: an unfurling fern frond -->
+	<path d="M256 432 C256 330 256 300 256 268 C256 196 316 150 372 168 C424 186 432 252 392 282 C356 308 306 290 308 250 C310 222 342 212 360 230"
+		fill="none" stroke="#f6f3ec" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/>
+	<path d="M256 330 C220 300 168 300 140 330" fill="none" stroke="#f6f3ec" stroke-width="26" stroke-linecap="round" opacity=".85"/>
+	<circle cx="372" cy="246" r="10" fill="#fb923c"/>
+</svg>
