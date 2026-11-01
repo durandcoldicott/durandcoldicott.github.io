@@ -21,6 +21,13 @@
 	DECK.topics.forEach(function (t) {
 		var topic = { id: t.id, mi: t.mi, en: t.en, icon: t.icon, group: t.group || "path", source: t.source || "", cards: [] };
 		t.cards.forEach(function (raw) {
+			if (typeof raw === "string" && raw.charAt(0) === "@") {
+				// shared with an earlier topic: same card, same progress
+				var shared = CARD_BY_ID[raw.slice(1)];
+				if (!shared) throw new Error("Unknown shared card " + raw);
+				topic.cards.push(shared);
+				return;
+			}
 			var extra = raw[2] || {};
 			var card = {
 				id: t.id + "-" + slug(raw[0]),
@@ -266,6 +273,7 @@
 		{ id: "count", icon: "🔢", mi: "Tatau", en: "Know all the numbers", test: function () { return topicKnown("tau"); } },
 		{ id: "days", icon: "📅", mi: "Ngā rā", en: "Know all the days and time words", test: function () { return topicKnown("wa"); } },
 		{ id: "kare", icon: "😊", mi: "Kare-ā-roto", en: "Know all the Tākaro! feelings words", test: function () { return topicKnown("kare"); } },
+		{ id: "tta", icon: "🔺", mi: "Tau, Tae, Āhua", en: "Know all the Tākaro! numbers, colours and shapes", test: function () { return topicKnown("tta"); } },
 		{ id: "words25", icon: "📗", mi: "Rua tekau mā rima", en: "25 words learned", test: function () { return solidCount() >= 25; } },
 		{ id: "words100", icon: "📚", mi: "Kotahi rau", en: "100 words learned", test: function () { return solidCount() >= 100; } },
 		{ id: "perfect", icon: "💎", mi: "Tika rawa", en: "A perfect lesson (10+ answers, no mistakes)", test: function () { return state.stats.perfect >= 1; } },
@@ -384,9 +392,11 @@
 	}
 
 	function distractors(card, field) {
-		var pool = TOPIC_BY_ID[card.topic].cards.filter(function (c) { return c.id !== card.id && c[field] !== card[field] && c.pattern === card.pattern; });
+		// never offer a synonym (same English, e.g. pango/mangu) or a duplicate as a wrong answer
+		var ok = function (c) { return c.id !== card.id && c.en !== card.en && c[field] !== card[field] && c.pattern === card.pattern; };
+		var pool = TOPIC_BY_ID[card.topic].cards.filter(ok);
 		if (pool.length < 3) {
-			pool = pool.concat(CARDS.filter(function (c) { return c.topic !== card.topic && c[field] !== card[field] && c.pattern === card.pattern; }));
+			pool = pool.concat(CARDS.filter(function (c) { return c.topic !== card.topic && ok(c); }));
 		}
 		var out = [];
 		shuffle(pool.slice()).forEach(function (c) {
@@ -724,10 +734,11 @@
 			((due || fresh) ? '<button class="btn primary" data-action="start" data-mode="topic" data-topic="' + id + '">Study this topic</button>' : "") +
 			(c.seen ? '<button class="btn" data-action="start" data-mode="practice" data-topic="' + id + '">Practise</button>' : "") +
 			"</div><ul class=\"word-list\">";
+		var hasPics = t.cards.some(function (c) { return c.pic; });
 		t.cards.forEach(function (card) {
 			var st = cardStatus(card);
 			html += '<li class="word ' + st + '"><span class="status-dot" title="' + st + '"></span>' +
-				(card.pic ? '<span class="word-pic">' + card.pic + "</span>" : "") +
+				(card.pic ? '<span class="word-pic">' + card.pic + "</span>" : hasPics ? '<span class="word-pic"></span>' : "") +
 				'<div class="word-main"><span class="word-mi">' + (st === "new" ? '<span class="muted">' + blanks(card.mi) + "</span>" : blanks(card.mi)) + "</span>" +
 				'<span class="word-en">' + blanks(card.en) + "</span></div>" +
 				'<a class="teaka" href="' + teAkaUrl(card) + '" target="_blank" rel="noopener" title="Look up in Te Aka">Te Aka ↗</a></li>';
@@ -1541,5 +1552,5 @@
 	}
 
 	// test hook
-	window.__reo = { state: function () { return state; }, mergeStates: mergeStates, summary: summary, pushNow: pushNow, CARDS: CARDS, schedule: schedule, addDays: addDays, currentStreak: currentStreak };
+	window.__reo = { state: function () { return state; }, distractors: function (id, f) { return distractors(CARD_BY_ID[id], f); }, mergeStates: mergeStates, summary: summary, pushNow: pushNow, CARDS: CARDS, schedule: schedule, addDays: addDays, currentStreak: currentStreak };
 })();
