@@ -430,3 +430,16 @@ summary { cursor: pointer; color: var(--brand-text); font-weight: 600; padding: 
 .fb-list .member.done { opacity: .55; }
 .fb-msg-text { margin: 4px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .btn-row.tight { margin: 4px 0 0; gap: 6px; }
+
+/* ---------- "save as a web app" strip ---------- */
+.install-strip {
+	position: sticky; top: 0; z-index: 30;
+	display: flex; align-items: center; gap: 10px;
+	background: var(--brand-soft); color: var(--text);
+	padding: calc(8px + env(safe-area-inset-top)) 12px 8px 16px;
+	font-size: .88rem; line-height: 1.35;
+	border-bottom: 1px solid var(--line);
+}
+.install-strip span { flex: 1; }
+.install-strip a { color: var(--brand-text); font-weight: 700; white-space: nowrap; }
+.strip-close { font: inherit; background: none; border: 0; color: var(--muted); font-size: 1rem; width: 36px; height: 36px; flex-shrink: 0; cursor: pointer; }

@@ -6,6 +6,25 @@
 		.then(function (r) { if (r.ok) location.replace("/panana/"); })
 		.catch(function () {});
 
+	// "Save as a web app" strip (same rule and dismissal as inside the app)
+	(function () {
+		var KEY = "panana.installStripDismissed";
+		var mobile = /iPhone|iPad|iPod|Android/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+		var installed = (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || navigator.standalone === true;
+		var dismissed = false;
+		try { dismissed = localStorage.getItem(KEY) === "1"; } catch (e) {}
+		if (!mobile || installed || dismissed) return;
+		var strip = document.createElement("div");
+		strip.className = "install-strip";
+		strip.setAttribute("role", "note");
+		strip.innerHTML = '<span>📲 <b>Save as a web app</b> for the best experience. <a href="/panana/install">Learn more</a></span><button class="strip-close" aria-label="Dismiss">✕</button>';
+		strip.querySelector("button").addEventListener("click", function () {
+			try { localStorage.setItem(KEY, "1"); } catch (e) {}
+			strip.remove();
+		});
+		document.body.insertBefore(strip, document.body.firstChild);
+	})();
+
 	var forms = { login: document.getElementById("login-form"), join: document.getElementById("join-form") };
 
 	document.querySelectorAll("[data-tab]").forEach(function (btn) {
