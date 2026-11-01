@@ -590,6 +590,9 @@
 			root.innerHTML = html + renderTabs();
 		}
 		if (!keepScroll) window.scrollTo(0, 0);
+		// leave room under the content for the pinned feedback panel
+		var fb = root.querySelector(".feedback"), body = root.querySelector(".s-body");
+		if (fb && body) body.style.paddingBottom = (fb.offsetHeight + 16) + "px";
 	}
 
 	function renderTabs() {
@@ -921,16 +924,21 @@
 		return html;
 	}
 
+	// Answer feedback is a panel pinned to the bottom of the screen, so
+	// Continue is always in reach without scrolling.
 	function feedback(cur) {
 		var card = cur.card;
 		var msg;
 		if (cur.correct && cur.macronSlip) msg = "Almost! Watch the macrons:";
-		else if (cur.correct) msg = pick(["Ka pai!", "Tika!", "Tino pai!", "Ka rawe!", "Koia kei a koe!"]);
+		else if (cur.correct) msg = cur.praise || (cur.praise = pick(["Ka pai!", "Tika!", "Tino pai!", "Ka rawe!", "Koia kei a koe!"]));
 		else msg = "Not quite. The answer:";
-		return '<div class="feedback ' + (cur.correct ? (cur.macronSlip ? "almost" : "good") : "bad") + '">' +
-			'<div class="fb-msg">' + msg + "</div>" +
-			'<div class="fb-answer"><b>' + blanks(card.mi) + "</b> — " + blanks(card.en) + "</div>" +
-			detailBlock(card) +
+		return '<div class="feedback ' + (cur.correct ? (cur.macronSlip ? "almost" : "good") : "bad") + '" role="status">' +
+			'<div class="fb-top"><div class="fb-msg">' + msg + "</div>" +
+			'<a class="teaka" href="' + teAkaUrl(card) + '" target="_blank" rel="noopener">Te Aka ↗</a></div>' +
+			'<div class="fb-answer">' + (card.pic ? '<span class="fb-pic" aria-hidden="true">' + card.pic + "</span>" : "") +
+			"<span><b>" + blanks(card.mi) + "</b> — " + blanks(card.en) + "</span></div>" +
+			(card.note ? '<p class="fb-note">' + esc(card.note) + "</p>" : "") +
+			(card.ex ? '<p class="fb-note"><b>' + esc(card.ex) + "</b> — " + esc(card.exEn) + "</p>" : "") +
 			'<button class="btn primary big" data-action="next">Continue</button></div>';
 	}
 
