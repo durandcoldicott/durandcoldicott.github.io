@@ -159,7 +159,8 @@ p { margin: .4em 0; }
 .day.frozen .day-dot { background: var(--ice); color: #fff; }
 .day.today .day-dot { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--brand); }
 .day.future { opacity: .45; }
-.day-name { font-size: .75rem; color: var(--muted); }
+.day-name { font-size: .64rem; color: var(--muted); letter-spacing: -.01em; white-space: nowrap; }
+.day.today .day-name { color: var(--text); font-weight: 700; }
 
 .goal-card { display: flex; align-items: center; gap: 16px; }
 .goal-side { flex: 1; min-width: 0; }

@@ -275,6 +275,7 @@
 		{ id: "kare", icon: "😊", mi: "Kare-ā-roto", en: "Know all the Tākaro! feelings words", test: function () { return topicKnown("kare"); } },
 		{ id: "tta", icon: "🔺", mi: "Tau, Tae, Āhua", en: "Know all the Tākaro! numbers, colours and shapes", test: function () { return topicKnown("tta"); } },
 		{ id: "bits", icon: "🛋️", mi: "Ngā Taputapu", en: "Know all the Tākaro! Bits + Bobs words", test: function () { return topicKnown("bits"); } },
+		{ id: "orig", icon: "🥝", mi: "Kupu Taketake", en: "Know all the Tākaro! Original words", test: function () { return topicKnown("orig"); } },
 		{ id: "words25", icon: "📗", mi: "Rua tekau mā rima", en: "25 words learned", test: function () { return solidCount() >= 25; } },
 		{ id: "words100", icon: "📚", mi: "Kotahi rau", en: "100 words learned", test: function () { return solidCount() >= 100; } },
 		{ id: "perfect", icon: "💎", mi: "Tika rawa", en: "A perfect lesson (10+ answers, no mistakes)", test: function () { return state.stats.perfect >= 1; } },
@@ -597,7 +598,9 @@
 	// ---------------------------------------------------------------------
 	// UI: home
 	// ---------------------------------------------------------------------
-	var DAY_SHORT = ["Hi", "Tū", "Ap", "Pa", "Me", "Ho", "Ta"];
+	// Full Māori day names, Monday first (the deck teaches these in Te Wā).
+	var DAY_NAMES = ["Rāhina", "Rātū", "Rāapa", "Rāpare", "Rāmere", "Rāhoroi", "Rātapu"];
+	var DAY_EN = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
 	function ring(pct, label, sub) {
 		var r = 52, c = 2 * Math.PI * r;
@@ -621,7 +624,7 @@
 			else if (state.frozen.indexOf(k) !== -1) { cls += " frozen"; mark = "❄"; }
 			if (k === t) cls += " today";
 			if (k > t) cls += " future";
-			out += '<div class="' + cls + '"><span class="day-dot">' + mark + '</span><span class="day-name">' + DAY_SHORT[i] + "</span></div>";
+			out += '<div class="' + cls + '" title="' + DAY_NAMES[i] + " — " + DAY_EN[i] + '"><span class="day-dot">' + mark + '</span><span class="day-name">' + DAY_NAMES[i] + "</span></div>";
 		}
 		return '<div class="week">' + out + "</div>";
 	}
