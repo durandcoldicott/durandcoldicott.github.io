@@ -3,7 +3,7 @@
  * the cache in the background, so updates appear on the next launch.
  * Bump VERSION when the file list changes.
  */
-var VERSION = "panana-v11";
+var VERSION = "panana-v12";
 var FILES = [
 	"./",
 	"index.html",
