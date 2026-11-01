@@ -274,6 +274,7 @@
 		{ id: "days", icon: "📅", mi: "Ngā rā", en: "Know all the days and time words", test: function () { return topicKnown("wa"); } },
 		{ id: "kare", icon: "😊", mi: "Kare-ā-roto", en: "Know all the Tākaro! feelings words", test: function () { return topicKnown("kare"); } },
 		{ id: "tta", icon: "🔺", mi: "Tau, Tae, Āhua", en: "Know all the Tākaro! numbers, colours and shapes", test: function () { return topicKnown("tta"); } },
+		{ id: "bits", icon: "🛋️", mi: "Ngā Taputapu", en: "Know all the Tākaro! Bits + Bobs words", test: function () { return topicKnown("bits"); } },
 		{ id: "words25", icon: "📗", mi: "Rua tekau mā rima", en: "25 words learned", test: function () { return solidCount() >= 25; } },
 		{ id: "words100", icon: "📚", mi: "Kotahi rau", en: "100 words learned", test: function () { return solidCount() >= 100; } },
 		{ id: "perfect", icon: "💎", mi: "Tika rawa", en: "A perfect lesson (10+ answers, no mistakes)", test: function () { return state.stats.perfect >= 1; } },
@@ -392,8 +393,9 @@
 	}
 
 	function distractors(card, field) {
-		// never offer a synonym (same English, e.g. pango/mangu) or a duplicate as a wrong answer
-		var ok = function (c) { return c.id !== card.id && c.en !== card.en && c[field] !== card[field] && c.pattern === card.pattern; };
+		// never offer a synonym (same English, e.g. pango/mangu) or a homograph (same
+		// Māori, e.g. karaka = clock / orange) as a wrong answer — both would be right
+		var ok = function (c) { return c.id !== card.id && c.en !== card.en && c.mi !== card.mi && c.pattern === card.pattern; };
 		var pool = TOPIC_BY_ID[card.topic].cards.filter(ok);
 		if (pool.length < 3) {
 			pool = pool.concat(CARDS.filter(function (c) { return c.topic !== card.topic && ok(c); }));
