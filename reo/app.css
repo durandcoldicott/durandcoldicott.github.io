@@ -344,3 +344,16 @@ summary { cursor: pointer; color: var(--brand); font-weight: 600; padding: 6px 0
 .auth-form label { display: flex; flex-direction: column; gap: 4px; font-weight: 600; font-size: .92rem; }
 .auth-form[hidden] { display: none; }
 .auth-error { color: var(--bad); margin: 0; min-height: 1.2em; font-size: .9rem; }
+
+/* ---------- group admin ---------- */
+.admin-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.choices.tight { margin: 0; gap: 6px; }
+.choices.tight .chip { min-width: 40px; padding: 4px 10px; min-height: 36px; }
+.members-title { font-size: 1rem; margin: 18px 0 6px; }
+.members { list-style: none; padding: 0; margin: 0 0 8px; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.member { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-top: 1px solid var(--line); }
+.member:first-child { border-top: 0; }
+.member-main { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.member .pill { display: inline-block; }
+.btn.danger-sm { color: var(--bad); min-height: 36px; padding: 6px 10px; font-size: .85rem; flex-shrink: 0; }
+.good-text { color: var(--good); }

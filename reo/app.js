@@ -775,15 +775,7 @@
 			'<input name="next" type="password" autocomplete="new-password" minlength="8" placeholder="New password (8+ characters)" required>' +
 			'<button class="btn" type="submit">Change password</button></form></details>' +
 			'<button class="btn" data-action="logout">Sign out</button></section>';
-		if (user && user.admin) {
-			account += '<section class="card"><h2>Group admin</h2>' +
-				'<p class="small">Invite code: ' + (user.invite ? '<code class="invite">' + esc(user.invite) + "</code>" : '<span class="muted">not set — add REO_INVITE_CODE in Cloudflare</span>') + "</p>" +
-				'<p class="muted small">Friends sign up at durand.nz/reo with this code.</p>' +
-				'<details><summary>Reset a member\'s password</summary><form id="admin-form" class="mini-form">' +
-				'<input name="username" autocapitalize="none" autocorrect="off" placeholder="Their username" required>' +
-				'<input name="password" type="text" minlength="8" placeholder="New password (8+ characters)" required>' +
-				'<button class="btn" type="submit">Reset password</button></form></details></section>';
-		}
+		if (user && user.admin) account += renderAdmin();
 		return '<main class="page"><h1>Ētahi atu <span class="muted small">More</span></h1>' + account +
 			'<section class="card"><h2>Daily goal</h2><p class="muted small">Answers per day to keep your streak.</p>' + choice("goal", [5, 10, 20, 30], s.goal) +
 			'<h2>New words per day</h2>' + choice("newPerDay", [3, 5, 8, 12], s.newPerDay) + "</section>" +
@@ -992,6 +984,7 @@
 				topicView = null;
 				render();
 				if (view === "ropu" || view === "home") refreshBoard();
+				if (view === "more" && user && user.admin) loadAdmin();
 				break;
 			case "board": boardMetric = el.getAttribute("data-metric"); render(true); break;
 			case "toggle-board":
@@ -1001,6 +994,20 @@
 				render(true);
 				break;
 			case "logout": logout(); break;
+			case "admin-newcode":
+				if (confirm("Make a new invite code? The current one stops working straight away (existing members aren't affected).")) adminConfig({ newInvite: true }, "New invite code ready.");
+				break;
+			case "admin-closed": {
+				var closing = !adminData.config.closed;
+				adminConfig({ closed: closing }, closing ? "Sign-ups closed." : "Sign-ups open.");
+				break;
+			}
+			case "admin-max": adminConfig({ max: +el.getAttribute("data-max") }, "Member limit updated."); break;
+			case "admin-remove": {
+				var who = el.getAttribute("data-u");
+				if (confirm("Remove @" + who + "? This deletes their account and all their progress, and signs them out. It can't be undone.")) adminRemove(who);
+				break;
+			}
 			case "topic": topicView = el.getAttribute("data-topic"); render(); break;
 			case "back": topicView = null; render(); break;
 			case "start": startSession(el.getAttribute("data-mode"), el.getAttribute("data-topic")); break;
@@ -1167,7 +1174,9 @@
 		}
 		var lm = "";
 		Object.keys(state.days).forEach(function (k) { if (state.days[k].met && k > lm) lm = k; });
-		return { xp: state.xp, wk: wk, wx: wx, px: px, st: currentStreak(), lm: lm, lr: solidCount(), h: !!state.settings.hideFromBoard };
+		var la = "";
+		Object.keys(state.days).forEach(function (k) { if (state.days[k].reviews > 0 && k > la) la = k; });
+		return { xp: state.xp, wk: wk, wx: wx, px: px, st: currentStreak(), lm: lm, lr: solidCount(), la: la, h: !!state.settings.hideFromBoard };
 	}
 
 	function stripped(s) {
@@ -1268,6 +1277,87 @@
 			toast(r.ok ? "Password reset for " + d.username + "." : r.data.error || "Couldn't reset.");
 			if (r.ok) form.reset();
 		}).catch(function () { toast("Can't reach the server."); });
+	}
+
+	// ---------------------------------------------------------------------
+	// Group admin (only shown to usernames listed in REO_ADMINS)
+	// ---------------------------------------------------------------------
+	var adminData = null; // { members, config }
+	var adminError = "";
+
+	function loadAdmin() {
+		api("GET", "admin/members").then(function (r) {
+			if (!r.ok) { adminError = r.data.error || "Couldn't load members."; }
+			else { adminData = r.data; adminError = ""; user.invite = r.data.config.invite; }
+			if (!session && view === "more") render(true);
+		}).catch(function () { adminError = "Can't reach the server."; if (view === "more") render(true); });
+	}
+
+	function adminConfig(change, okMsg) {
+		api("POST", "admin/config", change).then(function (r) {
+			if (!r.ok) return toast(r.data.error || "Couldn't save.");
+			adminData.config = r.data.config;
+			user.invite = r.data.config.invite;
+			toast(okMsg);
+			render(true);
+		}).catch(function () { toast("Can't reach the server."); });
+	}
+
+	function adminRemove(username) {
+		api("POST", "admin/remove", { username: username }).then(function (r) {
+			if (!r.ok) return toast(r.data.error || "Couldn't remove.");
+			toast("Removed @" + username + ".");
+			if (board) board = board.filter(function (e) { return e.u !== username; });
+			loadAdmin();
+		}).catch(function () { toast("Can't reach the server."); });
+	}
+
+	function daysAgo(key) {
+		if (!key) return "never";
+		var t = todayKey();
+		if (key === t) return "today";
+		if (key === addDays(t, -1)) return "yesterday";
+		var n = 0, k = key;
+		while (k < t && n < 400) { k = addDays(k, 1); n++; }
+		return n >= 400 ? "over a year ago" : n + " days ago";
+	}
+
+	function renderAdmin() {
+		var html = '<section class="card admin"><h2>Group admin</h2>';
+		if (!adminData) {
+			html += '<p class="muted small">' + (adminError ? esc(adminError) : "Loading members…") + "</p></section>";
+			return html;
+		}
+		var c = adminData.config, m = adminData.members;
+		html += '<div class="admin-row"><div><div class="eyebrow">Invite code</div>' +
+			(c.closed ? '<span class="muted">Sign-ups closed</span>' : c.invite ? '<code class="invite">' + esc(c.invite) + "</code>" : '<span class="muted">None set</span>') + "</div>" +
+			'<button class="btn" data-action="admin-newcode">New code</button></div>' +
+			'<p class="muted small">Friends sign up at durand.nz/reo with this code. If it gets shared too widely, make a new one — the old code stops working, and existing members keep their accounts.</p>' +
+			'<div class="toggle-row"><span>Allow new sign-ups</span><button class="chip' + (c.closed ? "" : " active") + '" data-action="admin-closed">' + (c.closed ? "Closed" : "Open") + "</button></div>" +
+			'<div class="toggle-row"><span>Member limit</span><span class="choices tight">' + [10, 25, 50].map(function (n) {
+				return '<button class="chip' + (c.max === n ? " active" : "") + '" data-action="admin-max" data-max="' + n + '">' + n + "</button>";
+			}).join("") + (([10, 25, 50].indexOf(c.max) === -1) ? '<button class="chip active">' + c.max + "</button>" : "") + "</span></div>";
+
+		html += '<h3 class="members-title">Members <span class="muted small">' + m.length + " of " + c.max + "</span></h3>";
+		if (m.length >= c.max) html += '<p class="banner warn small">The group is full — new sign-ups are blocked until you remove someone or raise the limit.</p>';
+		html += '<ul class="members">';
+		m.forEach(function (x) {
+			var active = x.lastActive === todayKey();
+			html += '<li class="member">' +
+				'<span class="avatar">' + esc((x.name || x.username).charAt(0).toUpperCase()) + "</span>" +
+				'<div class="member-main"><strong>' + esc(x.name) + "</strong> <span class=\"muted small\">@" + esc(x.username) + "</span>" +
+				(x.admin ? ' <span class="pill">admin</span>' : "") + (x.hidden ? ' <span class="pill warn">hidden</span>' : "") +
+				'<div class="muted small">Joined ' + (x.joined ? esc(x.joined.slice(0, 10)) : "?") + " · Last practised " + (active ? '<b class="good-text">today</b>' : daysAgo(x.lastActive)) + "</div>" +
+				'<div class="muted small">' + x.xp + " XP · " + x.words + " words · 🔥 " + (x.lastMet >= addDays(todayKey(), -1) ? x.streak : 0) + "</div></div>" +
+				(x.admin || x.username === user.username ? "" : '<button class="btn danger-sm" data-action="admin-remove" data-u="' + esc(x.username) + '">Remove</button>') +
+				"</li>";
+		});
+		html += "</ul>";
+		html += '<details><summary>Reset a member\'s password</summary><form id="admin-form" class="mini-form">' +
+			'<input name="username" autocapitalize="none" autocorrect="off" placeholder="Their username" required>' +
+			'<input name="password" type="text" minlength="8" placeholder="New password (8+ characters)" required>' +
+			'<button class="btn" type="submit">Reset password</button></form></details></section>';
+		return html;
 	}
 
 	// ---------------------------------------------------------------------
