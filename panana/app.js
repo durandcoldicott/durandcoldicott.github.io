@@ -104,7 +104,7 @@
 			freezeAwardedOn: "",
 			achievements: {}, // id -> date earned
 			proverbs: [],    // indexes unlocked
-			settings: { goal: 10, newPerDay: 5, hideFromBoard: false },
+			settings: { goal: 10, newPerDay: 5, hideFromBoard: false, sound: true },
 			stats: { sessions: 0, perfect: 0, typedPerfect: 0, bestStreak: 0, answers: 0, right: 0, weeksWon: 0, wonWeek: "" },
 		};
 	}
@@ -1014,6 +1014,47 @@
 	}
 
 	// record a graded answer
+	// ---------------------------------------------------------------------
+	// Sounds: short tones synthesised with Web Audio (no files, works
+	// offline), plus a light buzz on phones that support vibration.
+	// [frequency Hz, start s, length s, wave, volume]
+	// ---------------------------------------------------------------------
+	var SOUNDS = {
+		correct: [[880, 0, 0.12, "sine", 0.16], [1318.5, 0.08, 0.22, "sine", 0.14]],
+		almost: [[660, 0, 0.12, "sine", 0.12], [880, 0.09, 0.18, "sine", 0.1]],
+		wrong: [[233, 0, 0.16, "triangle", 0.12], [196, 0.1, 0.24, "triangle", 0.1]],
+		tap: [[1400, 0, 0.035, "sine", 0.04]],
+		goal: [[523.25, 0, 0.14, "triangle", 0.14], [659.25, 0.1, 0.14, "triangle", 0.14], [783.99, 0.2, 0.14, "triangle", 0.14], [1046.5, 0.3, 0.4, "triangle", 0.15]],
+		done: [[659.25, 0, 0.14, "sine", 0.1], [987.77, 0.12, 0.3, "sine", 0.1]],
+		achievement: [[783.99, 0, 0.12, "triangle", 0.13], [987.77, 0.1, 0.12, "triangle", 0.13], [1174.66, 0.2, 0.12, "triangle", 0.13], [1567.98, 0.32, 0.5, "sine", 0.14]],
+		levelup: [[523.25, 0, 0.12, "triangle", 0.14], [783.99, 0.12, 0.12, "triangle", 0.14], [1046.5, 0.24, 0.12, "triangle", 0.14], [1318.5, 0.36, 0.12, "triangle", 0.14], [1567.98, 0.48, 0.6, "sine", 0.16]] };
+	var VIBES = { correct: 15, almost: 15, wrong: [30, 40, 30], goal: [20, 30, 20, 30, 40], achievement: [20, 30, 60], levelup: [20, 30, 20, 30, 80] };
+	var audioCtx = null;
+	function sfx(kind) {
+		if (!state.settings.sound) return;
+		try {
+			var AC = window.AudioContext || window.webkitAudioContext;
+			if (!AC || !SOUNDS[kind]) return;
+			audioCtx = audioCtx || new AC();
+			if (audioCtx.state === "suspended") audioCtx.resume();
+			var now = audioCtx.currentTime + 0.01;
+			SOUNDS[kind].forEach(function (n) {
+				var o = audioCtx.createOscillator(), g = audioCtx.createGain();
+				o.type = n[3];
+				o.frequency.value = n[0];
+				g.gain.setValueAtTime(0.0001, now + n[1]);
+				g.gain.exponentialRampToValueAtTime(n[4], now + n[1] + 0.012);
+				g.gain.exponentialRampToValueAtTime(0.0001, now + n[1] + n[2]);
+				o.connect(g);
+				g.connect(audioCtx.destination);
+				o.start(now + n[1]);
+				o.stop(now + n[1] + n[2] + 0.05);
+			});
+		} catch (e) {}
+		try { if (navigator.vibrate && VIBES[kind]) navigator.vibrate(VIBES[kind]); } catch (e) {}
+		sfx.last = kind; // for tests
+	}
+
 	function record(correct, grade, xp) {
 		var cur = session.current;
 		var d = today();
@@ -1032,6 +1073,9 @@
 			session.total++;
 		}
 
+		var goalNow = !d.met && d.reviews >= state.settings.goal;
+		sfx(goalNow ? "goal" : correct ? (cur.macronSlip ? "almost" : "correct") : "wrong");
+		if (goalNow) toast("🎯 Daily goal reached! Ka pai!");
 		if (!d.met && d.reviews >= state.settings.goal) {
 			d.met = true;
 			session.goalJustMet = true;
@@ -1048,6 +1092,14 @@
 		}
 		cur.answered = true;
 		cur.correct = correct;
+		// a new level just opened?
+		var lvlNow = currentLevel();
+		if (lvlNow > (state.levelOpen || 1)) {
+			state.levelOpen = lvlNow;
+			session.levelUp = lvlNow;
+			if (!goalNow) setTimeout(function () { sfx("levelup"); }, 350);
+			toast("🔓 Taumata " + lvlNow + " is open!");
+		}
 		save();
 	}
 
@@ -1084,6 +1136,7 @@
 		save();
 		pushNow();
 		render();
+		sfx(session.newAchievements.length ? "achievement" : session.levelUp ? "levelup" : "done");
 	}
 
 	function quitSession() {
@@ -1384,6 +1437,8 @@
 			'<button class="btn" data-action="logout">Sign out</button></section>';
 		if (user && user.admin) account += renderAdmin();
 		return '<main class="page"><h1>Ētahi atu <span class="muted small">More</span></h1>' + account +
+			'<section class="card"><div class="toggle-row"><span><b>Sounds</b><br><span class="muted small">Chimes for right answers, goals and achievements' + (navigator.vibrate ? ", plus a little buzz" : "") + '</span></span>' +
+			'<button class="chip' + (s.sound ? " active" : "") + '" data-action="toggle-sound">' + (s.sound ? "On" : "Off") + "</button></div></section>" +
 			'<section class="card"><h2>Daily goal</h2><p class="muted small">Answers per day to keep your streak.</p>' + choice("goal", [5, 10, 20, 30], s.goal) +
 			'<h2>New words per day</h2>' + choice("newPerDay", [3, 5, 8, 12], s.newPerDay) + "</section>" +
 
@@ -1656,6 +1711,13 @@
 				render(true);
 				break;
 			case "logout": logout(); break;
+			case "toggle-sound":
+				state.settings.sound = !state.settings.sound;
+				save();
+				pushNow();
+				render(true);
+				if (state.settings.sound) sfx("correct");
+				break;
 			case "admin-newcode":
 				if (confirm("Make a new invite code? The current one stops working straight away (existing members aren't affected).")) adminConfig({ newInvite: true }, "New invite code ready.");
 				break;
@@ -1675,7 +1737,7 @@
 			case "start": startSession(el.getAttribute("data-mode"), el.getAttribute("data-topic")); break;
 			case "quit": quitSession(); break;
 			case "done": session = null; render(); break;
-			case "intro-ok": finishIntro(); break;
+			case "intro-ok": sfx("tap"); finishIntro(); break;
 			case "mc": onMc(+el.getAttribute("data-i")); break;
 			case "reveal": session.current.revealed = true; render(); break;
 			case "grade": {
@@ -1695,7 +1757,7 @@
 				render(true);
 				break;
 			}
-			case "tile": session.current.built.push(+el.getAttribute("data-i")); render(true); break;
+			case "tile": sfx("tap"); session.current.built.push(+el.getAttribute("data-i")); render(true); break;
 			case "untile": session.current.built.splice(+el.getAttribute("data-k"), 1); render(true); break;
 			case "tiles-check": {
 				var tq = session.current;
@@ -2186,6 +2248,9 @@
 			} catch (x) {}
 			state = load();
 			return offline ? null : pull();
+		}).then(function (r) {
+			if (!state.levelOpen) state.levelOpen = currentLevel();
+			return r;
 		}).then(function () {
 			reconcileFreezes();
 			render();
@@ -2208,5 +2273,5 @@
 	}
 
 	// test hook
-	window.__reo = { state: function () { return state; }, generate: function (id) { return generate(CARD_BY_ID[id]); }, genAvailable: function (id) { return genAvailable(CARD_BY_ID[id]); }, pickExercise: function (id, item) { return pickExercise(CARD_BY_ID[id], item || { kind: "review" }); }, distractors: function (id, f) { return distractors(CARD_BY_ID[id], f); }, mergeStates: mergeStates, summary: summary, pushNow: pushNow, CARDS: CARDS, schedule: schedule, addDays: addDays, currentStreak: currentStreak };
+	window.__reo = { state: function () { return state; }, lastSound: function () { return sfx.last; }, generate: function (id) { return generate(CARD_BY_ID[id]); }, genAvailable: function (id) { return genAvailable(CARD_BY_ID[id]); }, pickExercise: function (id, item) { return pickExercise(CARD_BY_ID[id], item || { kind: "review" }); }, distractors: function (id, f) { return distractors(CARD_BY_ID[id], f); }, mergeStates: mergeStates, summary: summary, pushNow: pushNow, CARDS: CARDS, schedule: schedule, addDays: addDays, currentStreak: currentStreak };
 })();
