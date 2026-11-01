@@ -295,6 +295,7 @@
 		{ id: "wild", icon: "🐋", mi: "Te Taiao", en: "Know all the Tākaro! Into the Wild words", test: function () { return topicKnown("wild"); } },
 		{ id: "rerenga", icon: "💬", mi: "Kaikōrero", en: "Answer 25 sentence questions correctly", test: function () { return (state.stats.sentences || 0) >= 25; } },
 		{ id: "term1", icon: "🎓", mi: "Wāhanga tuatahi", en: "Know every Term 1 revision topic", test: function () { return ["tikanga", "pehea", "hua", "tau1", "ahua"].every(topicKnown); } },
+		{ id: "term2", icon: "🎓", mi: "Wāhanga tuarua", en: "Know every Term 2 revision topic", test: function () { return ["mihi2", "tangata", "tuahua", "tuwahi"].every(topicKnown); } },
 		{ id: "ahua", icon: "🔷", mi: "Āhua, Tae, Tatau", en: "Know all the course words and patterns for shapes, colours and counting", test: function () { return topicKnown("ahua"); } },
 		{ id: "words25", icon: "📗", mi: "Rua tekau mā rima", en: "25 words learned", test: function () { return solidCount() >= 25; } },
 		{ id: "words100", icon: "📚", mi: "Kotahi rau", en: "100 words learned", test: function () { return solidCount() >= 100; } },
@@ -388,9 +389,10 @@
 	})();
 
 	// Words that work in "He ___ tēnei" / "E hia ngā ___": concrete things with a unique picture.
-	var THING_TOPICS = { tinana: 1, kai: 1, wahi: 1, tta: 1, bits: 1, orig: 1, wild: 1, ahua: 1, whanau: 1, hua: 1 };
+	var THING_TOPICS = { tinana: 1, kai: 1, wahi: 1, tta: 1, bits: 1, orig: 1, wild: 1, ahua: 1, whanau: 1, hua: 1, tuwahi: 1 };
 	var NOT_THINGS = { "inu": 1, "pakipaki": 1, "hongi": 1, "iti": 1, "āhua": 1, "Aotearoa": 1, "waiporoporo": 1, "mangu": 1, "kōrero": 1,
-		"tēnei": 1, "tēnā": 1, "tērā": 1 };
+		"tēnei": 1, "tēnā": 1, "tērā": 1, "runga": 1, "raro": 1, "roto": 1, "waho": 1, "mua": 1, "muri": 1, "waenganui": 1,
+		"taha matau": 1, "taha mauī": 1 };
 	function knownThings(noPeople) {
 		return CARDS.filter(function (c) {
 			return THING_TOPICS[c.topic] && c.picQuiz && !c.gen && !NOT_THINGS[c.mi] && c.mi.indexOf("?") === -1 &&
@@ -402,9 +404,67 @@
 		["whanau-pēpi", "pēpi", "pēpi", "babies"], ["whanau-kuia", "kuia", "kuia", "elderly women"],
 		["whanau-koroua", "koroua", "koroua", "elderly men"], ["whanau-wahine", "wahine", "wāhine", "women"],
 		["whanau-tāne", "tāne", "tāne", "men"], ["whanau-tangata", "tangata", "tāngata", "people"],
-		["whanau-tamāhine", "tamāhine", "tamāhine", "daughters"]];
+		["whanau-tamāhine", "tamāhine", "tamāhine", "daughters"], ["tangata-kaumātua", "kaumātua", "kaumātua", "elders"],
+		["tangata-pākeke", "pākeke", "pākeke", "adults"], ["tangata-kōtiro", "kōtiro", "kōtiro", "girls"],
+		["tangata-rangatahi", "rangatahi", "rangatahi", "teenagers"]];
 
 	function firstGloss(en) { return en.split(" / ")[0]; }
+
+	// Paku mihi lines: [card id, Māori with ___, English with ___]
+	var INTRO_LINES = [
+		["mihi2-nō-x-ōku-tūpuna", "Nō ___ ōku tūpuna.", "My ancestors are from ___."],
+		["pepeha-nō-x-ahau", "Nō ___ ahau.", "I am from ___."],
+		["mihi2-i-whānau-mai-au-i-x", "I whānau mai au i ___.", "I was born in ___."],
+		["mihi2-i-tipu-ake-au-i-x", "I tipu ake au i ___.", "I grew up in ___."],
+		["mihi2-kei-x-au-e-noho-ana", "Kei ___ au e noho ana.", "I live in ___."]];
+	var PLACE_IDS = ["mihi2-whakatū", "mihi2-ōmaio", "mihi2-waimeha", "mihi2-waimārama", "orig-aotearoa"];
+
+	// Describing words and things they sensibly describe (He [word] te/ngā [thing]).
+	var DESCRIBE = {
+		"tuahua-reka": ["kai-panana", "kai-āporo", "hua-rōpere", "hua-pītiti", "hua-merengi", "hua-tiere", "hua-kerepi", "orig-tiakarete", "kai-huka", "kai-kūmara", "orig-ārani"],
+		"tuahua-kawa": ["hua-rēmana"],
+		"tuahua-haunga": ["bits-tōkena", "bits-wharepaku", "kai-ika"],
+		"tuahua-newanewa": ["wild-ngeru", "orig-hipi", "wild-rāpeti", "bits-moenga", "bits-hōpa", "wild-kurī"],
+		"tuahua-ātaahua": ["tta-whetū", "wild-puāwai-kōwhai", "wild-puāwai-pōhutukawa", "wahi-maunga", "wahi-moana", "orig-tātahi"],
+		"tuahua-nui": ["wahi-whare", "wahi-maunga", "wild-tohorā", "orig-kau", "orig-taraka", "bits-pahi", "tuahua-arewhana"],
+		"ahua-iti": ["orig-pī", "hua-tiere", "wild-noke", "wild-pūpū-rangi", "orig-kī"],
+		"tuahua-roa": ["orig-tuna", "wahi-awa", "tinana-makawe", "bits-tereina", "wild-noke"],
+		"tuahua-teitei": ["wahi-maunga", "wild-ponga", "tuwahi-rākau"],
+		"tuahua-taumaha": ["ahua-pouaka", "orig-taraka", "orig-kau", "bits-piana", "tuahua-arewhana"],
+		"tuahua-koi": ["orig-naihi", "bits-pene-rākau", "wild-mangō"],
+		"tuahua-hōhonu": ["wahi-moana", "wahi-awa", "wahi-roto"],
+		"tuahua-māmā": ["bits-pepa"] };
+	var NO_PLURAL = { "wahi-moana": 1, "wahi-awa": 1, "wahi-roto": 1, "kai-huka": 1, "orig-tiakarete": 1, "tinana-makawe": 1 };
+	function describePairs() {
+		var out = [];
+		Object.keys(DESCRIBE).forEach(function (adj) {
+			if (!CARD_BY_ID[adj] || !known(adj)) return;
+			DESCRIBE[adj].forEach(function (n) { if (CARD_BY_ID[n] && known(n)) out.push([adj, n]); });
+		});
+		return out;
+	}
+
+	// Tūwahi: locative words and how they join to the place
+	var LOCS = [
+		["tuwahi-runga", "runga", "i", "on"], ["tuwahi-raro", "raro", "i", "under"], ["tuwahi-roto", "roto", "i", "inside"],
+		["tuwahi-waho", "waho", "i", "outside"], ["tuwahi-mua", "mua", "i", "in front of"], ["tuwahi-muri", "muri", "i", "behind"],
+		["tuwahi-taha-matau", "te taha matau", "o", "to the right of"], ["tuwahi-taha-mauī", "te taha mauī", "o", "to the left of"]];
+	var WHERE_THINGS = ["wild-ngeru", "wild-kurī", "orig-pukapuka", "orig-pene", "bits-kapu", "tuwahi-pōro", "kai-āporo", "kai-hēki", "orig-pōtae", "tuwahi-manu", "orig-paihikara"];
+	var WHERE_PLACES = ["orig-tūru", "bits-tēpu", "ahua-pouaka", "tuwahi-pēke", "bits-moenga", "bits-hōpa", "tuwahi-kāpata", "tuwahi-rūma", "wahi-whare", "tuwahi-rākau"];
+	// only pair each place word with places where it makes sense
+	var LOC_PLACES = {
+		"tuwahi-runga": ["orig-tūru", "bits-tēpu", "bits-moenga", "bits-hōpa", "ahua-pouaka", "tuwahi-rākau"],
+		"tuwahi-raro": ["orig-tūru", "bits-tēpu", "bits-moenga", "tuwahi-rākau", "bits-hōpa"],
+		"tuwahi-roto": ["ahua-pouaka", "tuwahi-pēke", "tuwahi-kāpata", "tuwahi-rūma", "wahi-whare"],
+		"tuwahi-waho": ["tuwahi-rūma", "wahi-whare"],
+		"tuwahi-mua": ["wahi-whare", "orig-tūru", "bits-tēpu", "tuwahi-rākau", "bits-hōpa", "ahua-pouaka"],
+		"tuwahi-muri": ["wahi-whare", "orig-tūru", "bits-tēpu", "tuwahi-rākau", "bits-hōpa", "ahua-pouaka"],
+		"tuwahi-taha-matau": ["orig-tūru", "bits-tēpu", "ahua-pouaka", "bits-moenga", "bits-hōpa", "wahi-whare"],
+		"tuwahi-taha-mauī": ["orig-tūru", "bits-tēpu", "ahua-pouaka", "bits-moenga", "bits-hōpa", "wahi-whare"] };
+	function locOptions() {
+		return LOCS.filter(function (l) { return known(l[0]) && knownIds(LOC_PLACES[l[0]]).length; });
+	}
+	function knownIds(ids) { return ids.filter(function (id) { return CARD_BY_ID[id] && known(id); }); }
 	function feelings() { return CARDS.filter(function (c) { return c.topic === "kare" && c.picQuiz && known(c.id); }); }
 	var SWATCHES = { "tae-whero": "🟥", "tae-karaka": "🟧", "tae-kōwhai": "🟨", "tae-kākāriki": "🟩", "tae-kikorangi": "🟦",
 		"tta-waiporoporo": "🟪", "tae-parauri": "🟫", "tae-pango": "⬛", "tae-mā": "⬜" };
@@ -437,6 +497,14 @@
 			case "list": return { ok: knownThings(true).length >= 6, need: "Learn 6 words with pictures (e.g. fruit) first." };
 			case "coloursOf":
 				return { ok: SWATCH_IDS.filter(known).length >= 3 && knownThings(true).length >= 2, need: "Learn 3 colours and 2 objects first." };
+			case "intro":
+				return { ok: INTRO_LINES.filter(function (l) { return known(l[0]); }).length >= 2 && knownIds(PLACE_IDS).length >= 2,
+					need: "Learn 2 paku mihi lines and 2 place names first." };
+			case "describe":
+				return { ok: describePairs().length >= 2, need: "Learn some describing words and things they describe (e.g. reka + fruit) first." };
+			case "where":
+				return { ok: locOptions().length >= 2 && knownIds(WHERE_THINGS).length >= 1 && knownIds(WHERE_PLACES).length >= 2,
+					need: "Learn 2 place words (runga, raro…), a thing and 2 places (tūru, tēpu…) first." };
 			case "tokohia":
 				var ppl = PEOPLE.filter(function (x) { return known(x[0]); }).length;
 				return { ok: nums >= 3 && ppl >= 2, need: "Learn 3 numbers and 2 people words (Te Whānau) first." };
@@ -547,6 +615,47 @@
 				"He " + c1.mi + ", he " + c2.mi + " te tae o te " + ob.mi + ".", "He " + c1.mi + " " + c2.mi + tail];
 			q = { visual: ob.pic + "  " + SWATCHES[cols[0]] + SWATCHES[cols[1]], ask: "He aha ngā tae o te " + ob.mi + "?", answer: ansM, wrong: wrongM,
 				en: "What are the colours of the " + firstGloss(ob.en) + "? " + cap(firstGloss(c1.en)) + " and " + firstGloss(c2.en) + "." };
+		}
+		if (card.gen === "intro") {
+			var lines = INTRO_LINES.filter(function (l) { return known(l[0]); });
+			var places = knownIds(PLACE_IDS).map(function (id) { return CARD_BY_ID[id]; });
+			var line = pick(lines), place = pick(places);
+			var fill = function (tpl, pl) { return tpl.replace("___", pl.mi); };
+			var placeEn = place.mi === "Aotearoa" ? "Aotearoa" : place.mi + " (" + place.en + ")";
+			var wrongI = INTRO_LINES.filter(function (l) { return l !== line; }).map(function (l) { return fill(l[1], place); });
+			places.filter(function (p2) { return p2.id !== place.id; }).forEach(function (p2) { wrongI.push(fill(line[1], p2)); });
+			q = { visual: "📍", ask: line[2].replace("___", placeEn), answer: fill(line[1], place), wrong: wrongI,
+				en: line[2].replace("___", placeEn) };
+		} else if (card.gen === "describe") {
+			var pr = pick(describePairs()), adj = CARD_BY_ID[pr[0]], noun = CARD_BY_ID[pr[1]];
+			var many = !NO_PLURAL[noun.id] && Math.random() < 0.45;
+			var art = many ? "ngā" : "te";
+			var ansDs = "He " + adj.mi + " " + art + " " + noun.mi + ".";
+			var otherAdj = shuffle(Object.keys(DESCRIBE).filter(function (a) { return a !== adj.id && CARD_BY_ID[a] && DESCRIBE[a].indexOf(noun.id) === -1; }))
+				.sort(function (a, b) { return (known(b) ? 1 : 0) - (known(a) ? 1 : 0); });
+			var wrongDs = ["He " + adj.mi + " " + (many ? "te" : "ngā") + " " + noun.mi + ".", "He " + noun.mi + " " + art + " " + adj.mi + "."];
+			otherAdj.slice(0, 3).forEach(function (a) { wrongDs.push("He " + CARD_BY_ID[a].mi + " " + art + " " + noun.mi + "."); });
+			var pic = noun.pic || "❓";
+			q = { visual: many ? pic + pic + (Math.random() < 0.5 ? pic : "") : pic, many: many, cue: firstGloss(adj.en) + (many ? " · more than one" : ""),
+				ask: "Describe " + (many ? "them" : "it") + " in te reo", answer: ansDs, wrong: wrongDs,
+				en: (many ? "The " + firstGloss(noun.en) + " (more than one) are " : "The " + firstGloss(noun.en) + " is ") + firstGloss(adj.en) + "." };
+		} else if (card.gen === "where") {
+			var loc = pick(locOptions());
+			var thing = CARD_BY_ID[pick(knownIds(WHERE_THINGS))];
+			var placesW = knownIds(LOC_PLACES[loc[0]]), plc = CARD_BY_ID[pick(placesW)];
+			var sayW = function (l, place, th) { return "Kei " + l[1] + " " + l[2] + " te " + place.mi + " te " + th.mi + "."; };
+			var ansW = sayW(loc, plc, thing);
+			// the course also teaches: Kei runga te pukapuka i te tēpu
+			var altW = "Kei " + loc[1] + " te " + thing.mi + " " + loc[2] + " te " + plc.mi + ".";
+			var wrongW = [];
+			shuffle(LOCS.filter(function (l) { return l !== loc; })).sort(function (a, b) { return (known(b[0]) ? 1 : 0) - (known(a[0]) ? 1 : 0); })
+				.slice(0, 2).forEach(function (l) { wrongW.push(sayW(l, plc, thing)); });
+			wrongW.push("Kei " + loc[1] + " " + (loc[2] === "i" ? "o" : "i") + " te " + plc.mi + " te " + thing.mi + ".");
+			var otherPlace = shuffle(placesW.filter(function (id) { return id !== plc.id; }))[0];
+			if (otherPlace) wrongW.push(sayW(loc, CARD_BY_ID[otherPlace], thing));
+			q = { visual: (thing.pic || "") + " " + (plc.pic || ""), ask: "Kei hea te " + thing.mi + "?",
+				cue: "(" + loc[3] + " the " + firstGloss(plc.en) + ")", answer: ansW, alts: loc[2] === "i" ? [altW] : [], wrong: wrongW,
+				en: "Where is the " + firstGloss(thing.en) + "? It's " + loc[3] + " the " + firstGloss(plc.en) + "." };
 		}
 		if (!q) return null;
 		q.options = optionSet(q.answer, q.wrong);
@@ -1197,6 +1306,7 @@
 			'<div class="fb-top"><div class="fb-msg">' + msg + "</div></div>" +
 			'<div class="fb-answer"><span><b>' + esc(q.ask) + " " + esc(q.answer) + "</b></span></div>" +
 			'<p class="fb-note">' + esc(q.en) + "</p>" +
+			(q.alts && q.alts.length ? '<p class="fb-note">Also correct: ' + esc(q.alts[0]) + "</p>" : "") +
 			(cur.correct ? "" : '<p class="fb-note">Pattern: ' + esc(cur.card.mi) + "</p>") +
 			'<button class="btn primary big" data-action="next">Continue</button></div>';
 	}
@@ -1368,7 +1478,7 @@
 				var tq = session.current;
 				if (tq.answered) break;
 				var made = tq.built.map(function (i) { return tq.bank[i]; }).join(" ");
-				var tok = made === words(tq.q.answer).join(" ");
+				var tok = [tq.q.answer].concat(tq.q.alts || []).some(function (a) { return made === words(a).join(" "); });
 				if (tok) state.stats.sentences = (state.stats.sentences || 0) + 1;
 				record(tok, tok ? 2 : 0, tok ? 15 : 2);
 				render(true);
