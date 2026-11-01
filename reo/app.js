@@ -49,6 +49,12 @@
 		});
 		TOPICS.push(topic);
 	});
+	// A picture can be a question ("What's this in te reo?") only if no other
+	// word in the deck uses the same picture — otherwise two answers would fit.
+	var PIC_USES = {};
+	CARDS.forEach(function (c) { if (c.pic) PIC_USES[c.pic] = (PIC_USES[c.pic] || 0) + 1; });
+	CARDS.forEach(function (c) { c.picQuiz = !!c.pic && PIC_USES[c.pic] === 1 && !c.pattern; });
+
 	var TOPIC_BY_ID = {};
 	TOPICS.forEach(function (t) { TOPIC_BY_ID[t.id] = t; });
 
@@ -389,6 +395,7 @@
 		if (item.drill) return "mc_en";
 		var cs = state.cards[card.id] || { reps: 0 };
 		var opts = ["mc_mi", "mc_en"];
+		if (card.picQuiz) opts.push("pic", "pic");
 		if (cs.reps >= 1 || item.kind === "practice") opts.push("flash");
 		if ((cs.reps >= 2 || item.kind === "practice") && !card.pattern) opts.push("type", "type");
 		return pick(opts);
@@ -448,7 +455,7 @@
 		if (ex === "mc_mi") {
 			cur.options = shuffle([card.en].concat(distractors(card, "en")));
 			cur.answer = card.en;
-		} else if (ex === "mc_en") {
+		} else if (ex === "mc_en" || ex === "pic") {
 			cur.options = shuffle([card.mi].concat(distractors(card, "mi")));
 			cur.answer = card.mi;
 		}
@@ -867,10 +874,13 @@
 				'<div class="big-word">' + blanks(card.mi) + "</div>" +
 				'<div class="big-en">' + blanks(card.en) + "</div>" + detailBlock(card) +
 				'<div class="s-foot"><button class="btn primary big" data-action="intro-ok">Got it</button></div>';
-		} else if (cur.ex === "mc_mi" || cur.ex === "mc_en") {
+		} else if (cur.ex === "mc_mi" || cur.ex === "mc_en" || cur.ex === "pic") {
 			var prompt = cur.ex === "mc_mi" ? card.mi : card.en;
-			html += tag + '<div class="s-kicker">' + (cur.ex === "mc_mi" ? "What does this mean?" : "How do you say this in te reo?") + "</div>" +
-				'<div class="big-word' + (cur.ex === "mc_en" ? " en" : "") + '">' + blanks(prompt) + '</div><div class="options">';
+			var kicker = cur.ex === "mc_mi" ? "What does this mean?" : cur.ex === "pic" ? "What's this in te reo?" : "How do you say this in te reo?";
+			html += tag + '<div class="s-kicker">' + kicker + "</div>" +
+				(cur.ex === "pic" ? '<div class="pic quiz-pic" role="img" aria-label="picture">' + card.pic + "</div>" :
+					'<div class="big-word' + (cur.ex === "mc_en" ? " en" : "") + '">' + blanks(prompt) + "</div>") +
+				'<div class="options">';
 			cur.options.forEach(function (o, i) {
 				var cls = "option";
 				if (cur.answered) {
@@ -1106,7 +1116,7 @@
 		if (e.key === "Enter" && cur.answered && cur.ex !== "flash") {
 			e.preventDefault();
 			advance();
-		} else if (!cur.answered && (cur.ex === "mc_mi" || cur.ex === "mc_en") && /^[1-4]$/.test(e.key)) {
+		} else if (!cur.answered && (cur.ex === "mc_mi" || cur.ex === "mc_en" || cur.ex === "pic") && /^[1-4]$/.test(e.key)) {
 			onMc(+e.key - 1);
 		}
 	});
@@ -1558,5 +1568,5 @@
 	}
 
 	// test hook
-	window.__reo = { state: function () { return state; }, distractors: function (id, f) { return distractors(CARD_BY_ID[id], f); }, mergeStates: mergeStates, summary: summary, pushNow: pushNow, CARDS: CARDS, schedule: schedule, addDays: addDays, currentStreak: currentStreak };
+	window.__reo = { state: function () { return state; }, pickExercise: function (id, item) { return pickExercise(CARD_BY_ID[id], item || { kind: "review" }); }, distractors: function (id, f) { return distractors(CARD_BY_ID[id], f); }, mergeStates: mergeStates, summary: summary, pushNow: pushNow, CARDS: CARDS, schedule: schedule, addDays: addDays, currentStreak: currentStreak };
 })();

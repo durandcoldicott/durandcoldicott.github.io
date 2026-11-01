@@ -364,3 +364,4 @@ summary { cursor: pointer; color: var(--brand); font-weight: 600; padding: 6px 0
 .pic.small-pic { font-size: 2.4rem; margin: 4px 0; }
 .word-pic { font-size: 1.4rem; width: 1.6em; text-align: center; flex-shrink: 0; }
 .source { color: var(--accent); font-weight: 600; margin: -4px 0 4px; }
+.pic.quiz-pic { font-size: 6rem; text-align: center; margin: 12px 0 20px; }
