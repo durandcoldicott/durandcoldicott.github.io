@@ -1200,12 +1200,24 @@
 			else if (view === "ropu") html = renderRopu();
 			else if (view === "progress") html = renderProgress();
 			else if (view === "more") html = renderMore();
-			root.innerHTML = html + renderTabs();
+			root.innerHTML = installStrip() + html + renderTabs();
 		}
 		if (!keepScroll) window.scrollTo(0, 0);
 		// leave room under the content for the pinned feedback panel
 		var fb = root.querySelector(".feedback"), body = root.querySelector(".s-body");
 		if (fb && body) body.style.paddingBottom = (fb.offsetHeight + 16) + "px";
+	}
+
+	// "Save as a web app" strip: phones/tablets only, hidden once installed or dismissed
+	var STRIP_KEY = "panana.installStripDismissed";
+	function installStrip() {
+		var mobile = /iPhone|iPad|iPod|Android/.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+		var installed = (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || navigator.standalone === true;
+		var dismissed = false;
+		try { dismissed = localStorage.getItem(STRIP_KEY) === "1"; } catch (e) {}
+		if (!mobile || installed || dismissed) return "";
+		return '<div class="install-strip" role="note"><span>📲 <b>Save as a web app</b> for the best experience. <a href="/panana/install">Learn more</a></span>' +
+			'<button class="strip-close" data-action="strip-dismiss" aria-label="Dismiss">✕</button></div>';
 	}
 
 	function renderTabs() {
@@ -1748,6 +1760,10 @@
 				render(true);
 				break;
 			case "logout": logout(); break;
+			case "strip-dismiss":
+				try { localStorage.setItem(STRIP_KEY, "1"); } catch (e) {}
+				var stripEl = root.querySelector(".install-strip"); if (stripEl) stripEl.remove();
+				break;
 			case "fb-kind": fbKind = el.getAttribute("data-kind"); render(true); break;
 			case "report-open":
 				session.current.reporting = true; render(true);
