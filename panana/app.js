@@ -296,7 +296,7 @@
 		{ id: "rerenga", icon: "💬", mi: "Kaikōrero", en: "Answer 25 sentence questions correctly", test: function () { return (state.stats.sentences || 0) >= 25; } },
 		{ id: "term1", icon: "🎓", mi: "Wāhanga tuatahi", en: "Know every Term 1 revision topic", test: function () { return ["tikanga", "pehea", "hua", "tau1", "ahua"].every(topicKnown); } },
 		{ id: "term2", icon: "🎓", mi: "Wāhanga tuarua", en: "Know every Term 2 revision topic", test: function () { return ["mihi2", "tangata", "tuahua", "tuwahi"].every(topicKnown); } },
-		{ id: "term3", icon: "🎓", mi: "Wāhanga tuatoru", en: "Know every Term 3 revision topic", test: function () { return ["whanau3", "pupuri", "moku", "tupou"].every(topicKnown); } },
+		{ id: "term3", icon: "🎓", mi: "Wāhanga tuatoru", en: "Know every Term 3 revision topic", test: function () { return ["whanau3", "pupuri", "moku", "tupou", "tohutohu"].every(topicKnown); } },
 		{ id: "ahua", icon: "🔷", mi: "Āhua, Tae, Tatau", en: "Know all the course words and patterns for shapes, colours and counting", test: function () { return topicKnown("ahua"); } },
 		{ id: "words25", icon: "📗", mi: "Rua tekau mā rima", en: "25 words learned", test: function () { return solidCount() >= 25; } },
 		{ id: "words100", icon: "📚", mi: "Kotahi rau", en: "100 words learned", test: function () { return solidCount() >= 100; } },
@@ -501,6 +501,22 @@
 		["tupou-mātou", "mātou", "🗣️🧍🧍", "me + others, not you"], ["tupou-tātou", "tātou", "🗣️👂🧍", "me + you + others"],
 		["tupou-koutou", "koutou", "👂👂👂", "you (3+)"], ["tupou-rātou", "rātou", "🧍🧍🧍", "them (3+)"]];
 
+	// Tohutohu: [card, Māori, English, needs a place (ki te) / person (ki a) / nothing]
+	var COMMANDS = [
+		["tohutohu-tikina", "Tikina", "Fetch", ""], ["tohutohu-hurihia", "Hurihia", "Turn", ""],
+		["tohutohu-homai", "Homai", "Give me", ""], ["tohutohu-hoatu", "Hoatu", "Give", "person"],
+		["tohutohu-waiho", "Waiho", "Leave", "place"], ["tohutohu-meatia", "Meatia", "Put", "place"],
+		["tohutohu-whakahokia", "Whakahokia", "Return", "place"]];
+	// things you'd be told to move, and where each kind sensibly goes
+	var CMD_THINGS = {
+		kitchen: { things: ["bits-kapu", "tohutohu-pereti", "tohutohu-pune", "tohutohu-tīrou", "orig-naihi", "bits-kōhua"], places: ["tohutohu-pae", "bits-tēpu"] },
+		clothes: { things: ["tohutohu-kākahu", "orig-pōtae", "bits-tōkena"], places: ["bits-moenga", "tuwahi-rūma"] },
+		desk: { things: ["orig-pene", "orig-pukapuka"], places: ["bits-tēpu", "tuwahi-rūma"] },
+		lid: { things: ["tohutohu-taupoki"], places: ["bits-kōhua"] } };
+	var CMD_PEOPLE = ["Māmā", "Pāpā", "Hōne", "Mere", "Aroha", "Wiremu"];
+	function enPlural(en) { var g = firstGloss(en); return /s$/.test(g) ? g : g === "knife" ? "knives" : g + "s"; }
+	function enIn(placeId) { return placeId === "tuwahi-rūma" ? "in" : placeId === "tohutohu-pae" || placeId === "bits-tēpu" || placeId === "bits-moenga" || placeId === "bits-kōhua" ? "on" : "to"; }
+
 	// Profile foods / likes: known a-category food or activity things
 	var LIKES = ["kai-panana", "kai-āporo", "orig-tiakarete", "hua-rōpere", "orig-whutupōro", "orig-pukapuka", "bits-kitā", "kai-ika", "kai-kūmara"];
 	function feelings() { return CARDS.filter(function (c) { return c.topic === "kare" && c.picQuiz && known(c.id); }); }
@@ -555,6 +571,10 @@
 					need: "Learn some numbers, 2 colours, 2 place names (Term 2 mihi) and 2 foods first." };
 			case "pronoun":
 				return { ok: PRONOUNS.filter(function (x) { return known(x[0]); }).length >= 4, need: "Learn 4 of the pronouns first." };
+			case "command":
+				var cmdThings = [].concat.apply([], Object.keys(CMD_THINGS).map(function (k) { return knownIds(CMD_THINGS[k].things); }));
+				return { ok: COMMANDS.filter(function (c) { return known(c[0]); }).length >= 3 && cmdThings.length >= 2 && known("hua-te") && known("hua-ngā"),
+					need: "Learn 3 commands, te and ngā, and 2 things (kapu, pereti…) first." };
 			case "tokohia":
 				var ppl = PEOPLE.filter(function (x) { return known(x[0]); }).length;
 				return { ok: nums >= 3 && ppl >= 2, need: "Learn 3 numbers and 2 people words (Te Whānau) first." };
@@ -787,6 +807,43 @@
 				.slice(0, 3).map(function (x) { return x[1]; });
 			q = { visual: pr[2], cue: "🗣️ me (speaking) · 👂 you (listening) · 🧍 someone else", ask: "Which pronoun?", answer: pr[1], wrong: wrongP, mcOnly: true,
 				en: pr[3] + " → " + pr[1] + " (" + firstGloss(CARD_BY_ID[pr[0]].en) + ")." };
+		}
+		if (card.gen === "command") {
+			var cmds = COMMANDS.filter(function (c) { return known(c[0]); });
+			var groups = Object.keys(CMD_THINGS).filter(function (k) { return knownIds(CMD_THINGS[k].things).length; });
+			var grp = CMD_THINGS[pick(groups)];
+			var th = CARD_BY_ID[pick(knownIds(grp.things))];
+			// pick a command that works with this thing (place commands need a known place for it)
+			var placesK = knownIds(grp.places);
+			var usable = cmds.filter(function (c) { return c[3] !== "place" || placesK.length; });
+			var cmd = pick(usable);
+			var many = th.id !== "tohutohu-kākahu" && th.id !== "bits-tōkena" && th.id !== "tohutohu-taupoki" && Math.random() < 0.4;
+			var art = many ? "ngā" : "te", artW = many ? "te" : "ngā";
+			var thingEn = th.id === "tohutohu-kākahu" || th.id === "bits-tōkena" ? firstGloss(th.en) : many ? enPlural(th.en) : firstGloss(th.en);
+			var base = function (verb, a) { return verb + " " + a + " " + th.mi; };
+			var ansC, wrongC = [], enC;
+			var otherCmd = function (filterKind) { return shuffle(COMMANDS.filter(function (c) { return c !== cmd && (!filterKind || c[3] === cmd[3]); })); };
+			if (cmd[3] === "place") {
+				var pl = CARD_BY_ID[pick(placesK)];
+				ansC = base(cmd[1], art) + " ki te " + pl.mi + ".";
+				wrongC.push(base(cmd[1], artW) + " ki te " + pl.mi + ".", base(cmd[1], art) + " ki a " + pl.mi + ".");
+				otherCmd("place").slice(0, 2).forEach(function (c) { wrongC.push(base(c[1], art) + " ki te " + pl.mi + "."); });
+				enC = cmd[2] + " the " + thingEn + " " + (cmd[1] === "Whakahokia" ? "to" : enIn(pl.id)) + " the " + firstGloss(pl.en) + ".";
+			} else if (cmd[3] === "person") {
+				var person = pick(CMD_PEOPLE);
+				ansC = base("Hoatu", art) + " ki a " + person + ".";
+				wrongC.push(base("Homai", art) + " ki a " + person + ".", base("Hoatu", art) + " ki te " + person + ".", base("Hoatu", artW) + " ki a " + person + ".");
+				var personEn = person === "Māmā" ? "Mum" : person === "Pāpā" ? "Dad" : person;
+				enC = "Give the " + thingEn + " to " + personEn + ".";
+			} else {
+				ansC = base(cmd[1], art) + ".";
+				wrongC.push(base(cmd[1], artW) + ".");
+				otherCmd("").filter(function (c) { return c[3] === ""; }).slice(0, 3).forEach(function (c) { wrongC.push(base(c[1], art) + "."); });
+				if (cmd[1] === "Homai") wrongC.push(base("Hoatu", art) + " ki a au.");
+				enC = cmd[2] + " the " + thingEn + ".";
+			}
+			var picC = th.pic || "";
+			q = { visual: many ? picC + picC : picC, many: many, ask: "Say: " + enC, answer: ansC, wrong: wrongC, en: enC };
 		}
 		if (!q) return null;
 		q.options = optionSet(q.answer, q.wrong);
