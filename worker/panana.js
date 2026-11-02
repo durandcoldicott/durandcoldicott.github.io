@@ -439,8 +439,9 @@ async function deleteAccount(request, env, session) {
 	const kv = kvOf(env);
 	if (await tooManyFails(kv, request)) return json({ error: "Too many attempts. Try again in 15 minutes." }, 429);
 	const body = await readBody(request);
+	if (!body || body.confirm !== "DELETE") return json({ error: "Type DELETE to confirm." }, 400);
 	const user = await kv.get(P + "user:" + session.u, "json");
-	if (!user || !body || !(await verifyPassword(user, String(body.password || "")))) {
+	if (!user || !(await verifyPassword(user, String(body.password || "")))) {
 		await recordFail(kv, request);
 		return json({ error: "That password isn't right." }, 403);
 	}

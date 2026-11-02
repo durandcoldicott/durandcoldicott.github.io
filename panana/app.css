@@ -471,3 +471,22 @@ summary { cursor: pointer; color: var(--brand-text); font-weight: 600; padding: 
 .syll-vowels { font-size: .8rem; color: var(--muted); margin-top: 6px; }
 .word-mi .syll { font-weight: 400; }
 .word-mi .info-btn { width: 22px; height: 22px; font-size: .8rem; }
+
+/* "Type DELETE to confirm" sheet */
+.danger-sheet { position: fixed; inset: 0; z-index: 60; display: flex; align-items: flex-end; justify-content: center; }
+.ds-backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, .55); animation: ds-fade .15s ease-out; }
+.ds-panel { position: relative; width: 100%; max-width: 520px; margin: 0; border-radius: 20px 20px 0 0;
+	padding: 20px 16px calc(16px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 10px;
+	border-top: 3px solid var(--bad); animation: ds-up .2s ease-out; }
+.ds-panel h2 { margin: 0; color: var(--bad); }
+.ds-panel p { margin: 0; }
+.ds-panel label { display: flex; flex-direction: column; gap: 6px; }
+.ds-panel input { font: inherit; font-size: 1rem; padding: 12px; border-radius: 12px; border: 2px solid var(--line); background: var(--surface-2); color: inherit; }
+.ds-panel input:focus { outline: none; border-color: var(--bad); }
+.ds-word { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .05em; color: var(--bad); }
+.ds-error { color: var(--bad); min-height: 0; }
+.ds-error:empty { display: none; }
+.btn.danger-fill { background: var(--bad); color: #fff; border-color: var(--bad); }
+.btn.danger-fill:disabled { opacity: .4; cursor: not-allowed; }
+@keyframes ds-up { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes ds-fade { from { opacity: 0; } to { opacity: 1; } }

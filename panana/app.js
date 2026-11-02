@@ -1534,9 +1534,8 @@
 			'<p class="muted small">Lost a phone, or signed in on a shared device? Sign out everywhere except here.</p>' +
 			'<button class="btn" data-action="signout-others">Sign out other devices</button>' +
 			(user && user.admin ? '<p class="muted small">Group admins can\'t delete their own account here.</p>' :
-				'<form id="delete-form" class="mini-form"><p class="small"><b>Delete my account</b> — removes your account, progress, reminders and feedback for good. This can\'t be undone.</p>' +
-				'<input name="password" type="password" autocomplete="current-password" placeholder="Your password to confirm" required>' +
-				'<button class="btn danger" type="submit">Delete my account</button></form>') +
+				'<p class="small"><b>Delete my account</b> — removes your account, progress, reminders and feedback for good.</p>' +
+				'<button class="btn danger" data-action="delete-account">Delete my account…</button>') +
 			'</details>' +
 			'<button class="btn" data-action="logout">Sign out</button></section>';
 		if (user && user.admin) account += renderAdmin();
@@ -1563,7 +1562,7 @@
 			'<section class="card"><h2>Your progress</h2><p class="muted small">Your progress syncs to your account automatically. You can also keep a backup file.</p>' +
 			'<div class="btn-row"><button class="btn" data-action="export">Export backup</button>' +
 			'<label class="btn">Import backup<input type="file" accept="application/json,.json" id="import-file" hidden></label></div>' +
-			'<button class="btn danger" data-action="reset">Reset all progress</button></section>' +
+			'<button class="btn danger" data-action="reset">Reset all progress…</button></section>' +
 
 			'<section class="card"><h2>About the words</h2><p class="small">This deck is a hand-curated draft, not machine translation. Each word links to <a href="https://maoridictionary.co.nz" target="_blank" rel="noopener">Te Aka Māori Dictionary</a>, the authority. If something here disagrees with Te Aka, trust Te Aka. Spelling follows <a href="https://www.tetaurawhiri.govt.nz" target="_blank" rel="noopener">Te Taura Whiri i te Reo Māori</a> (Māori Language Commission) conventions.</p>' +
 			'<p class="muted small">' + CARDS.length + " cards · " + TOPICS.length + " topics · " + DECK.proverbs.length + " whakataukī</p></section>" +
@@ -1874,7 +1873,12 @@
 			case "admin-max": adminConfig({ max: +el.getAttribute("data-max") }, "Member limit updated."); break;
 			case "admin-remove": {
 				var who = el.getAttribute("data-u");
-				if (confirm("Remove @" + who + "? This deletes their account and all their progress, and signs them out. It can't be undone.")) adminRemove(who);
+				dangerConfirm({
+					title: "Remove @" + who + "?",
+					body: "This deletes their account and all their progress, and signs them out on every device.",
+					word: who,
+					button: "Remove member",
+				}, function (done) { adminRemove(who); done(); });
 				break;
 			}
 			case "topic": topicView = el.getAttribute("data-topic"); render(); break;
@@ -1933,13 +1937,28 @@
 				break;
 			case "export": exportData(); break;
 			case "reset":
-				if (confirm("Delete ALL progress, streaks and achievements? This can't be undone.") && confirm("Really? Consider exporting a backup first.")) {
+				dangerConfirm({
+					title: "Reset all progress?",
+					body: "This wipes every word you've learned, your streak, XP and achievements, on all your devices. Your account stays. Tip: export a backup first.",
+					word: "RESET",
+					button: "Reset everything",
+				}, function (done) {
 					state = defaultState();
 					save();
 					pushNow();
+					done();
 					toast("Progress reset.");
 					render();
-				}
+				});
+				break;
+			case "delete-account":
+				dangerConfirm({
+					title: "Delete your account?",
+					body: "This permanently deletes your account, progress, reminders and feedback, and signs you out everywhere.",
+					word: "DELETE",
+					password: true,
+					button: "Delete my account",
+				}, deleteAccount);
 				break;
 		}
 	});
@@ -1954,7 +1973,6 @@
 			var rd = formData(form), ctxR = reportContext(session.current);
 			sendFeedback({ kind: "correction", message: rd.message, about: ctxR.about, card: ctxR.card }, form);
 		} else if (form.id === "password-form") changePassword(form);
-		else if (form.id === "delete-form") deleteAccount(form);
 		else if (form.id === "admin-form") adminReset(form);
 		else onType(false);
 	});
@@ -2172,11 +2190,52 @@
 		}).catch(function () { toast("Can't reach the server."); });
 	}
 
-	function deleteAccount(form) {
-		var d = formData(form);
-		if (!confirm("Delete your Panana account and all your progress? This can't be undone.")) return;
-		api("POST", "account/delete", { password: d.password }).then(function (r) {
-			if (!r.ok) { toast(r.data.error || "Couldn't delete your account."); return; }
+	// A bottom sheet for things that can't be undone: explain, then make the
+	// person type a word (and, if asked, their password) before the button works.
+	function dangerConfirm(o, onConfirm) {
+		var old = document.querySelector(".danger-sheet");
+		if (old) old.remove();
+		var wrap = document.createElement("div");
+		wrap.className = "danger-sheet";
+		wrap.innerHTML = '<div class="ds-backdrop" data-ds="cancel"></div>' +
+			'<form class="ds-panel card" role="dialog" aria-modal="true" aria-labelledby="ds-title" autocomplete="off">' +
+			'<h2 id="ds-title">⚠️ ' + esc(o.title) + "</h2>" +
+			'<p class="small">' + esc(o.body) + "</p>" +
+			'<p class="small"><b>This can\'t be undone.</b></p>' +
+			'<label class="small"><span>Type <b class="ds-word">' + esc(o.word) + '</b> to confirm</span>' +
+			'<input name="word" autocapitalize="off" autocorrect="off" spellcheck="false" autocomplete="off" required></label>' +
+			(o.password ? '<label class="small"><span>Your password</span><input name="password" type="password" autocomplete="current-password" required></label>' : "") +
+			'<p class="ds-error small" role="alert"></p>' +
+			'<button class="btn danger-fill big" type="submit" disabled>' + esc(o.button) + "</button>" +
+			'<button class="btn" type="button" data-ds="cancel">Cancel</button></form>';
+		document.body.appendChild(wrap);
+		var form = wrap.querySelector("form"), word = form.word, pass = form.password, go = form.querySelector("[type=submit]"), err = wrap.querySelector(".ds-error");
+		function ready() {
+			go.disabled = word.value.trim() !== o.word || (pass && !pass.value);
+		}
+		function close() { wrap.remove(); document.removeEventListener("keydown", onKey); }
+		function onKey(e) { if (e.key === "Escape") close(); }
+		form.addEventListener("input", ready);
+		wrap.addEventListener("click", function (e) { if (e.target.getAttribute("data-ds") === "cancel") close(); });
+		document.addEventListener("keydown", onKey);
+		form.addEventListener("submit", function (e) {
+			e.preventDefault();
+			ready();
+			if (go.disabled) return;
+			go.disabled = true;
+			err.textContent = "";
+			onConfirm(close, { password: pass ? pass.value : "", word: word.value.trim() }, function (msg) {
+				err.textContent = msg;
+				ready();
+			});
+		});
+		setTimeout(function () { word.focus(); }, 50);
+	}
+
+	function deleteAccount(close, d, fail) {
+		api("POST", "account/delete", { password: d.password, confirm: d.word }).then(function (r) {
+			if (!r.ok) { fail(r.data.error || "Couldn't delete your account."); return; }
+			close();
 			dirty = false;
 			clearTimeout(pushTimer);
 			try {
@@ -2184,7 +2243,7 @@
 				localStorage.removeItem("reo.lastUser");
 			} catch (e) {}
 			unsubscribeLocalPush().then(function () { location.href = "/panana/login?deleted=1"; });
-		}).catch(function () { toast("Can't reach the server."); });
+		}).catch(function () { fail("Can't reach the server."); });
 	}
 
 	// drop this browser's push subscription (the server copy is already gone)
