@@ -23,7 +23,7 @@
 		var topic = { id: t.id, mi: t.mi, en: t.en, icon: t.icon, group: t.group || "path", source: t.source || "", level: t.level || 0, picQuiz: t.picQuiz !== false, cards: [] };
 		t.cards.forEach(function (raw) {
 			if (raw && typeof raw === "object" && !Array.isArray(raw) && raw.gen) {
-				var g = { id: t.id + "-gen-" + raw.gen, mi: raw.mi, en: raw.en, alt: [], note: raw.note || "", lookup: "",
+				var g = { id: (t.cardPrefix || t.id) + "-gen-" + raw.gen, mi: raw.mi, en: raw.en, alt: [], note: raw.note || "", lookup: "",
 					ex: raw.ex || "", exEn: raw.exEn || "", pic: "", topic: t.id, pattern: true, gen: raw.gen };
 				CARD_BY_ID[g.id] = g;
 				CARDS.push(g);
@@ -39,7 +39,7 @@
 			}
 			var extra = raw[2] || {};
 			var card = {
-				id: t.id + "-" + slug(raw[0]),
+				id: (t.cardPrefix || t.id) + "-" + slug(raw[0]),
 				mi: raw[0],
 				en: raw[1],
 				alt: extra.alt || [],
