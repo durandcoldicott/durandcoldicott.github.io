@@ -47,12 +47,43 @@
 		});
 	});
 
+	// After deleting an account
+	if (/[?&]deleted=1/.test(location.search)) {
+		var note = document.createElement("p");
+		note.className = "card center";
+		note.textContent = "Your account and progress have been deleted. Ka kite anō!";
+		document.querySelector(".auth-tabs").before(note);
+	}
+
+	// Optional Cloudflare Turnstile bot check — only when the server has keys
+	var tsKey = null;
+	var tsWidgets = {};
+	fetch("/api/reo/public/config", { credentials: "same-origin" })
+		.then(function (r) { return r.json(); })
+		.then(function (cfg) {
+			if (!cfg || !cfg.turnstile) return;
+			tsKey = cfg.turnstile;
+			var s = document.createElement("script");
+			s.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+			s.async = true;
+			s.onload = function () {
+				document.querySelectorAll(".auth-form").forEach(function (form) {
+					var slot = form.querySelector(".ts-slot");
+					if (slot && window.turnstile) tsWidgets[form.id] = window.turnstile.render(slot, { sitekey: tsKey, size: "flexible", appearance: "interaction-only" });
+				});
+			};
+			document.head.appendChild(s);
+		})
+		.catch(function () {});
+
 	function wire(form, endpoint) {
 		form.addEventListener("submit", function (e) {
 			e.preventDefault();
 			var data = {};
 			new FormData(form).forEach(function (v, k) { data[k] = String(v); });
 			if (data.username) data.username = data.username.trim().toLowerCase();
+			if (tsKey && window.turnstile && tsWidgets[form.id] !== undefined) data.turnstile = window.turnstile.getResponse(tsWidgets[form.id]) || "";
+			delete data["cf-turnstile-response"];
 			var err = form.querySelector(".auth-error");
 			var btn = form.querySelector("button[type=submit]");
 			err.textContent = "";
@@ -74,6 +105,7 @@
 				})
 				.catch(function (x) {
 					err.textContent = x.message === "Failed to fetch" ? "Can't reach the server. Are you online?" : x.message;
+					if (tsKey && window.turnstile && tsWidgets[form.id] !== undefined) window.turnstile.reset(tsWidgets[form.id]);
 					btn.disabled = false;
 				});
 		});

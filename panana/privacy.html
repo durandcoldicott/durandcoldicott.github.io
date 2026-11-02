@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+	<meta name="color-scheme" content="light dark" />
+	<meta name="robots" content="noindex, nofollow" />
+	<title>Panana privacy</title>
+	<meta name="description" content="What Panana stores about you, who can see it, and how to delete it." />
+	<meta name="theme-color" content="#f5c400" />
+	<link rel="icon" href="/panana/icons/icon.svg" type="image/svg+xml" />
+	<link rel="stylesheet" href="/panana/app.css" />
+	<style>
+		.guide { max-width: 560px; margin: 0 auto; padding: calc(24px + env(safe-area-inset-top)) 16px 40px; }
+		.guide-head { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; }
+		.guide-head img { border-radius: 16px; flex-shrink: 0; }
+		.guide-head h1 { margin: 0; }
+		.guide ul { padding-left: 20px; margin: 8px 0 0; }
+		.guide li { margin: 6px 0; }
+		.guide h2 { margin-top: 0; }
+		.lead { margin: 0; }
+		.cta { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
+	</style>
+</head>
+<body>
+	<main class="guide">
+		<div class="guide-head">
+			<img src="/panana/icons/icon-192.png" alt="" width="64" height="64" />
+			<div>
+				<h1>Your privacy</h1>
+				<p class="muted lead">The short version: Panana keeps only what it needs to save your progress. No email, no ads, no selling data.</p>
+			</div>
+		</div>
+
+		<section class="card">
+			<h2>What we store</h2>
+			<ul>
+				<li><b>Your account</b> — the name you chose, your username and the date you joined. Your password is stored scrambled (hashed), so nobody can read it, including the organiser.</li>
+				<li><b>Your progress</b> — the words you've learned, your answers' history, streak, XP, goals and app settings.</li>
+				<li><b>Reminders</b> (only if you turn them on) — your reminder time, time zone and a code from your phone that lets us send the notification.</li>
+				<li><b>Feedback</b> you send, and which question it was about.</li>
+				<li><b>Sign-in</b> — a cookie that keeps you signed in for up to 90 days, and short-lived counts of failed sign-ins (cleared after 15 minutes) to stop password guessing.</li>
+			</ul>
+			<p class="muted small">We don't ask for your email, phone number or location, and Panana doesn't add analytics or advertising trackers.</p>
+		</section>
+
+		<section class="card">
+			<h2>Who can see it</h2>
+			<ul>
+				<li><b>Other members</b> see your name, streak and XP on the group leaderboard — unless you turn that off in <b>Ētahi atu → Show me on the group leaderboard</b>.</li>
+				<li><b>Group admins</b> can see the members list (names, usernames, when you joined, last active, streak and XP) and the feedback you send. They can reset your password or remove your account. They can't see your password.</li>
+				<li><b>Nobody else.</b> We don't share or sell your data.</li>
+			</ul>
+		</section>
+
+		<section class="card">
+			<h2>Where it's kept</h2>
+			<p>On <b>Cloudflare</b>, which runs the website and stores the data on its global network (so it may be held outside Aotearoa). A copy of your progress is also saved on your own device so Panana works offline. Reminders are delivered through Apple's or Google's notification service.</p>
+		</section>
+
+		<section class="card">
+			<h2>How long</h2>
+			<p>Until you delete your account or an admin removes it. Deleting is immediate and removes your account, progress, reminders and feedback.</p>
+		</section>
+
+		<section class="card">
+			<h2>Your choices</h2>
+			<ul>
+				<li><b>See your data</b> — <b>Ētahi atu → Export backup</b> downloads everything about your progress.</li>
+				<li><b>Fix it</b> — ask the organiser to change your name, or use the feedback form.</li>
+				<li><b>Delete it</b> — <b>Ētahi atu → Delete my account</b>.</li>
+				<li><b>Lost your phone?</b> Change your password or tap <b>Sign out other devices</b> in Ētahi atu.</li>
+			</ul>
+			<p class="muted small">These match your rights under the New Zealand Privacy Act 2020. Panana is a small, free, non-commercial app for our class, run by the group organiser at <a href="https://durand.nz">durand.nz</a> — get in touch there or through the feedback form with any questions.</p>
+		</section>
+
+		<div class="cta">
+			<a class="btn primary" href="/panana/">Open Panana</a>
+			<a class="btn" href="/panana/login">Sign in or join</a>
+		</div>
+	</main>
+</body>
+</html>
