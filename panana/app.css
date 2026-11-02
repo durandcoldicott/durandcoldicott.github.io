@@ -65,7 +65,8 @@ p { margin: .4em 0; }
 .muted { color: var(--muted); }
 .small { font-size: .85rem; font-weight: normal; }
 .center { text-align: center; }
-.blank { display: inline-block; min-width: 2.2em; border-bottom: 2px solid currentColor; color: transparent; line-height: 1; }
+/* hide the ___ text but keep the text colour, so the underline (currentColor) still shows */
+.blank { display: inline-block; min-width: 2.2em; border-bottom: 2px solid currentColor; -webkit-text-fill-color: transparent; line-height: 1; }
 
 #app { max-width: 560px; margin: 0 auto; }
 .page { padding: 16px 16px calc(96px + env(safe-area-inset-bottom)); }
