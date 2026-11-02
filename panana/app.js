@@ -1527,7 +1527,17 @@
 			'<details><summary>Change password</summary><form id="password-form" class="mini-form">' +
 			'<input name="current" type="password" autocomplete="current-password" placeholder="Current password" required>' +
 			'<input name="next" type="password" autocomplete="new-password" minlength="8" placeholder="New password (8+ characters)" required>' +
-			'<button class="btn" type="submit">Change password</button></form></details>' +
+			'<button class="btn" type="submit">Change password</button></form>' +
+			'<p class="muted small">Changing your password signs you out on every other device.</p></details>' +
+			'<details><summary>Privacy & your data</summary>' +
+			'<p class="muted small">What Panana stores and who can see it: <a href="/panana/privacy">privacy page</a>.</p>' +
+			'<p class="muted small">Lost a phone, or signed in on a shared device? Sign out everywhere except here.</p>' +
+			'<button class="btn" data-action="signout-others">Sign out other devices</button>' +
+			(user && user.admin ? '<p class="muted small">Group admins can\'t delete their own account here.</p>' :
+				'<form id="delete-form" class="mini-form"><p class="small"><b>Delete my account</b> — removes your account, progress, reminders and feedback for good. This can\'t be undone.</p>' +
+				'<input name="password" type="password" autocomplete="current-password" placeholder="Your password to confirm" required>' +
+				'<button class="btn danger" type="submit">Delete my account</button></form>') +
+			'</details>' +
 			'<button class="btn" data-action="logout">Sign out</button></section>';
 		if (user && user.admin) account += renderAdmin();
 		return '<main class="page"><h1>Ētahi atu <span class="muted small">More</span></h1>' + account +
@@ -1818,6 +1828,11 @@
 				render(true);
 				break;
 			case "logout": logout(); break;
+			case "signout-others":
+				api("POST", "account/signout-others", {}).then(function (r) {
+					toast(r.ok ? "Signed out on every other device." : r.data.error || "Couldn't do that.");
+				}).catch(function () { toast("Can't reach the server."); });
+				break;
 			case "syll": {
 				var panel = document.getElementById(el.getAttribute("data-target"));
 				if (panel) { panel.hidden = !panel.hidden; el.setAttribute("aria-expanded", String(!panel.hidden)); el.classList.toggle("on", !panel.hidden); }
@@ -1939,6 +1954,7 @@
 			var rd = formData(form), ctxR = reportContext(session.current);
 			sendFeedback({ kind: "correction", message: rd.message, about: ctxR.about, card: ctxR.card }, form);
 		} else if (form.id === "password-form") changePassword(form);
+		else if (form.id === "delete-form") deleteAccount(form);
 		else if (form.id === "admin-form") adminReset(form);
 		else onType(false);
 	});
@@ -2154,6 +2170,31 @@
 			toast(r.ok ? "Password changed." : r.data.error || "Couldn't change password.");
 			if (r.ok) form.reset();
 		}).catch(function () { toast("Can't reach the server."); });
+	}
+
+	function deleteAccount(form) {
+		var d = formData(form);
+		if (!confirm("Delete your Panana account and all your progress? This can't be undone.")) return;
+		api("POST", "account/delete", { password: d.password }).then(function (r) {
+			if (!r.ok) { toast(r.data.error || "Couldn't delete your account."); return; }
+			dirty = false;
+			clearTimeout(pushTimer);
+			try {
+				localStorage.removeItem(STORE_KEY);
+				localStorage.removeItem("reo.lastUser");
+			} catch (e) {}
+			unsubscribeLocalPush().then(function () { location.href = "/panana/login?deleted=1"; });
+		}).catch(function () { toast("Can't reach the server."); });
+	}
+
+	// drop this browser's push subscription (the server copy is already gone)
+	function unsubscribeLocalPush() {
+		if (!("serviceWorker" in navigator) || !window.PushManager) return Promise.resolve();
+		return Promise.race([
+			navigator.serviceWorker.ready.then(function (reg) { return reg.pushManager.getSubscription(); })
+				.then(function (sub) { return sub && sub.unsubscribe(); }),
+			new Promise(function (r) { setTimeout(r, 1500); }),
+		]).catch(function () {});
 	}
 
 	function adminReset(form) {

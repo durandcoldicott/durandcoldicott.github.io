@@ -18,6 +18,14 @@ crons = ["*/15 * * * *"]
 binding = "RATE_LIMIT_KV"
 id = "f19f1acb96f440ee9e2361c34a2eaa27"
 
+# Panana's own storage. Create a KV namespace called "panana" in the
+# Cloudflare dashboard (Storage & Databases > KV), paste its ID below and
+# remove the "#"s. On the next request Panana copies its existing "reo:" data
+# across from RATE_LIMIT_KV automatically.
+# [[kv_namespaces]]
+# binding = "REO_KV"
+# id = "PASTE-THE-NEW-NAMESPACE-ID-HERE"
+
 # ANTHROPIC_API_KEY is a secret, configured directly in the Cloudflare
 # dashboard (Settings > Environment variables) — it must never be written
 # here in plain text, and a plain "wrangler deploy" doesn't touch secrets
@@ -27,5 +35,7 @@ id = "f19f1acb96f440ee9e2361c34a2eaa27"
 #   REO_INVITE_CODE  the code people need to create an account
 #   REO_ADMINS       comma-separated usernames who can see the invite code
 #                    and reset members' passwords
-# Its data lives in RATE_LIMIT_KV under the "reo:" prefix (or in a REO_KV
-# namespace, if you bind one).
+# Optional bot check on sign-in / sign-up (off until both are set):
+#   TURNSTILE_SITE_KEY  (can be plain text)  and  TURNSTILE_SECRET  (Secret)
+# Its data lives in RATE_LIMIT_KV under the "reo:" prefix, or in REO_KV once
+# that's bound (above).

@@ -2,8 +2,10 @@
  * Backend for /panana (Panana, the te reo Māori study app): accounts, login sessions,
  * per-user progress sync and the group leaderboard.
  *
- * Storage: Cloudflare KV. Uses a REO_KV binding if one exists, otherwise the
- * site's existing RATE_LIMIT_KV namespace, with every key under "reo:".
+ * Storage: Cloudflare KV. Uses Panana's own REO_KV namespace if it's bound,
+ * otherwise the site's RATE_LIMIT_KV namespace, with every key under "reo:".
+ * When REO_KV is first bound, the existing "reo:" data is copied across
+ * automatically (see ensureStore) — the old copy is left in place.
  *
  *   reo:user:<username>      { username, name, salt, hash, iter, created }  + metadata { n, c }
  *   reo:sess:<token>         { u, n }                      (expires after 90 days)
@@ -20,6 +22,8 @@
  *                    app, which then takes precedence)
  *   REO_ADMINS       comma-separated usernames who can see the invite code and
  *                    reset members' passwords
+ *   TURNSTILE_SITE_KEY / TURNSTILE_SECRET  optional Cloudflare Turnstile bot
+ *                    check on sign-up and login (off until both are set)
  */
 
 const P = "reo:";
@@ -55,10 +59,63 @@ const PUBLIC_PAGES = new Set([
 	"/panana/install",
 	"/panana/install.html",
 	"/panana/install.js",
+	"/panana/privacy",
+	"/panana/privacy.html",
 ]);
 
 function kvOf(env) {
 	return env.REO_KV || env.RATE_LIMIT_KV;
+}
+
+// First time REO_KV is bound: copy every "reo:" key (with metadata and expiry)
+// from the shared namespace, then mark it done. Safe to repeat.
+let storeReady = null;
+function ensureStore(env) {
+	if (!env.REO_KV || !env.RATE_LIMIT_KV) return Promise.resolve();
+	if (!storeReady) storeReady = migrateStore(env).catch((e) => { storeReady = null; throw e; });
+	return storeReady;
+}
+async function migrateStore(env) {
+	if (await env.REO_KV.get(P + "migrated")) return;
+	const keys = await listAll(env.RATE_LIMIT_KV, P);
+	const nowSec = Math.floor(Date.now() / 1000);
+	for (const k of keys) {
+		if (/^reo:(fail|failu|fbcount):/.test(k.name)) continue; // short-lived counters
+		if (k.expiration && k.expiration < nowSec + 120) continue;
+		if ((await env.REO_KV.get(k.name)) !== null) continue; // never overwrite newer data
+		const value = await env.RATE_LIMIT_KV.get(k.name);
+		if (value === null) continue;
+		const opts = {};
+		if (k.metadata) opts.metadata = k.metadata;
+		if (k.expiration) opts.expiration = k.expiration;
+		await env.REO_KV.put(k.name, value, opts);
+	}
+	await env.REO_KV.put(P + "migrated", new Date().toISOString());
+}
+
+// Security headers for every Panana page and file
+const CSP = [
+	"default-src 'self'",
+	"script-src 'self' https://challenges.cloudflare.com",
+	"style-src 'self' 'unsafe-inline'",
+	"img-src 'self' data:",
+	"connect-src 'self' https://challenges.cloudflare.com",
+	"frame-src https://challenges.cloudflare.com",
+	"worker-src 'self'",
+	"manifest-src 'self'",
+	"object-src 'none'",
+	"base-uri 'none'",
+	"form-action 'self'",
+	"frame-ancestors 'none'",
+].join("; ");
+function secured(res) {
+	const out = new Response(res.body, res);
+	out.headers.set("Content-Security-Policy", CSP);
+	out.headers.set("X-Content-Type-Options", "nosniff");
+	out.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+	out.headers.set("X-Frame-Options", "DENY");
+	out.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=()");
+	return out;
 }
 
 async function getConfig(kv) {
@@ -155,10 +212,35 @@ async function tooManyFails(kv, request) {
 	const n = parseInt((await kv.get(P + "fail:" + clientIp(request))) || "0", 10);
 	return n >= MAX_FAILS;
 }
-async function recordFail(kv, request) {
+async function recordFail(kv, request, username) {
 	const key = P + "fail:" + clientIp(request);
 	const n = parseInt((await kv.get(key)) || "0", 10);
 	await kv.put(key, String(n + 1), { expirationTtl: 900 });
+	if (username) {
+		const ukey = P + "failu:" + username;
+		const m = parseInt((await kv.get(ukey)) || "0", 10);
+		await kv.put(ukey, String(m + 1), { expirationTtl: 900 });
+	}
+}
+async function accountLocked(kv, username) {
+	return parseInt((await kv.get(P + "failu:" + username)) || "0", 10) >= MAX_FAILS;
+}
+
+// Optional Cloudflare Turnstile check (on only when both keys are set)
+async function turnstileOk(env, request, token) {
+	if (!env.TURNSTILE_SECRET || !env.TURNSTILE_SITE_KEY) return true;
+	if (!token) return false;
+	try {
+		const form = new FormData();
+		form.append("secret", env.TURNSTILE_SECRET);
+		form.append("response", String(token));
+		form.append("remoteip", clientIp(request));
+		const r = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", { method: "POST", body: form });
+		const data = await r.json();
+		return !!data.success;
+	} catch (e) {
+		return false;
+	}
 }
 
 async function getSession(request, env) {
@@ -167,8 +249,10 @@ async function getSession(request, env) {
 	const kv = kvOf(env);
 	const s = await kv.get(P + "sess:" + token, "json");
 	if (!s) return null;
-	if (!(await kv.get(P + "user:" + s.u))) {
-		await kv.delete(P + "sess:" + token); // member was removed
+	const user = await kv.get(P + "user:" + s.u, "json");
+	// removed member, or signed out everywhere (password change / reset)
+	if (!user || (user.epoch || 0) !== (s.e || 0)) {
+		await kv.delete(P + "sess:" + token);
 		return null;
 	}
 	return { ...s, token };
@@ -176,7 +260,7 @@ async function getSession(request, env) {
 
 async function createSession(kv, user) {
 	const token = hex(crypto.getRandomValues(new Uint8Array(32)));
-	await kv.put(P + "sess:" + token, JSON.stringify({ u: user.username, n: user.name }), { expirationTtl: SESSION_TTL });
+	await kv.put(P + "sess:" + token, JSON.stringify({ u: user.username, n: user.name, e: user.epoch || 0 }), { expirationTtl: SESSION_TTL });
 	return token;
 }
 
@@ -231,6 +315,7 @@ async function register(request, env) {
 	if (await tooManyFails(kv, request)) return json({ error: "Too many attempts. Try again in 15 minutes." }, 429);
 	const body = await readBody(request);
 	if (!body) return json({ error: "Invalid request." }, 400);
+	if (!(await turnstileOk(env, request, body.turnstile))) return json({ error: "Please complete the quick check and try again." }, 403);
 
 	const username = String(body.username || "").trim().toLowerCase();
 	const name = cleanName(body.name) || username;
@@ -260,10 +345,14 @@ async function login(request, env) {
 	if (!body) return json({ error: "Invalid request." }, 400);
 	const username = String(body.username || "").trim().toLowerCase();
 	const password = String(body.password || "");
+	if (!(await turnstileOk(env, request, body.turnstile))) return json({ error: "Please complete the quick check and try again." }, 403);
+	if (USERNAME_RE.test(username) && (await accountLocked(kv, username))) {
+		return json({ error: "Too many attempts for this account. Try again in 15 minutes." }, 429);
+	}
 	const user = USERNAME_RE.test(username) ? await kv.get(P + "user:" + username, "json") : null;
 	const ok = user ? await verifyPassword(user, password) : (await hashPassword(password), false);
 	if (!ok) {
-		await recordFail(kv, request);
+		await recordFail(kv, request, USERNAME_RE.test(username) ? username : null);
 		return json({ error: "Wrong username or password." }, 403);
 	}
 	const token = await createSession(kv, user);
@@ -324,8 +413,49 @@ async function changePassword(request, env, session) {
 	const next = String(body.next || "");
 	if (next.length < 8) return json({ error: "New password must be at least 8 characters." }, 400);
 	Object.assign(user, await hashPassword(next));
+	return signOutOthers(kv, user, session);
+}
+
+// Bump the account's epoch (every existing session stops working), then give
+// this device a fresh session so it stays signed in.
+async function signOutOthers(kv, user, session) {
+	user.epoch = (user.epoch || 0) + 1;
 	await putUser(kv, user);
-	return json({ ok: true });
+	await kv.delete(P + "sess:" + session.token);
+	const token = await createSession(kv, user);
+	return json({ ok: true }, 200, { "Set-Cookie": sessionCookie(token, SESSION_TTL) });
+}
+
+async function signOutEverywhereElse(env, session) {
+	const kv = kvOf(env);
+	const user = await kv.get(P + "user:" + session.u, "json");
+	if (!user) return json({ error: "Not found." }, 404);
+	return signOutOthers(kv, user, session);
+}
+
+// Delete my account: needs the password; removes the account, progress,
+// reminders and the member's feedback, and signs out every device.
+async function deleteAccount(request, env, session) {
+	const kv = kvOf(env);
+	if (await tooManyFails(kv, request)) return json({ error: "Too many attempts. Try again in 15 minutes." }, 429);
+	const body = await readBody(request);
+	const user = await kv.get(P + "user:" + session.u, "json");
+	if (!user || !body || !(await verifyPassword(user, String(body.password || "")))) {
+		await recordFail(kv, request);
+		return json({ error: "That password isn't right." }, 403);
+	}
+	if (isAdmin(env, session.u)) {
+		return json({ error: "Group admins can't delete their account here — remove your username from REO_ADMINS in Cloudflare first." }, 400);
+	}
+	const fb = (await listAll(kv, P + "fb:")).filter((k) => k.metadata && k.metadata.u === session.u);
+	await Promise.all([
+		kv.delete(P + "user:" + session.u),
+		kv.delete(P + "progress:" + session.u),
+		kv.delete(P + "push:" + session.u),
+		kv.delete(P + "sess:" + session.token),
+		...fb.map((k) => kv.delete(k.name)),
+	]);
+	return json({ ok: true }, 200, { "Set-Cookie": sessionCookie("", 0) });
 }
 
 async function adminReset(request, env, session) {
@@ -339,6 +469,7 @@ async function adminReset(request, env, session) {
 	if (!user) return json({ error: "No member with that username." }, 404);
 	if (password.length < 8) return json({ error: "Password must be at least 8 characters." }, 400);
 	Object.assign(user, await hashPassword(password));
+	user.epoch = (user.epoch || 0) + 1; // signs them out of every device
 	await putUser(kv, user);
 	return json({ ok: true });
 }
@@ -637,6 +768,7 @@ function inWindow(minutes, hhmm) {
 export async function runReminders(env, nowMs = Date.now()) {
 	const kv = kvOf(env);
 	if (!kv) return { sent: 0 };
+	await ensureStore(env);
 	const subs = await listAll(kv, P + "push:");
 	if (!subs.length) return { sent: 0 };
 	let meta = null, vapid = null, sent = 0;
@@ -768,6 +900,7 @@ async function handleApi(request, env, path) {
 	const m = request.method;
 	if (m === "POST" && path === "register") return register(request, env);
 	if (m === "POST" && path === "login") return login(request, env);
+	if (m === "GET" && path === "public/config") return json({ turnstile: env.TURNSTILE_SECRET && env.TURNSTILE_SITE_KEY ? env.TURNSTILE_SITE_KEY : null });
 
 	const session = await getSession(request, env);
 	if (!session) return json({ error: "Not signed in." }, 401);
@@ -778,6 +911,8 @@ async function handleApi(request, env, path) {
 	if (m === "PUT" && path === "progress") return putProgress(request, env, session);
 	if (m === "GET" && path === "leaderboard") return leaderboard(env);
 	if (m === "POST" && path === "password") return changePassword(request, env, session);
+	if (m === "POST" && path === "account/signout-others") return signOutEverywhereElse(env, session);
+	if (m === "POST" && path === "account/delete") return deleteAccount(request, env, session);
 	if (m === "POST" && path === "admin/reset") return adminReset(request, env, session);
 	if (m === "GET" && path === "admin/members") return adminMembers(env, session);
 	if (m === "POST" && path === "admin/remove") return adminRemove(request, env, session);
@@ -804,7 +939,10 @@ export async function handlePanana(request, env, url) {
 
 	if (path.startsWith("/api/reo/")) {
 		if (!kvOf(env)) return json({ error: "Storage isn't configured." }, 503);
-		return handleApi(request, env, path.slice("/api/reo/".length));
+		await ensureStore(env);
+		const res = await handleApi(request, env, path.slice("/api/reo/".length));
+		res.headers.set("X-Content-Type-Options", "nosniff");
+		return res;
 	}
 
 	// The app used to live at /reo. Old installs have a service worker there
@@ -818,9 +956,10 @@ export async function handlePanana(request, env, url) {
 	}
 
 	if (path === "/panana" || path.startsWith("/panana/")) {
-		if (PUBLIC_PAGES.has(path) || path.startsWith("/panana/icons/")) return env.ASSETS.fetch(request);
+		if (PUBLIC_PAGES.has(path) || path.startsWith("/panana/icons/")) return secured(await env.ASSETS.fetch(request));
+		if (kvOf(env)) await ensureStore(env);
 		const session = kvOf(env) ? await getSession(request, env) : null;
-		if (session) return env.ASSETS.fetch(request);
+		if (session) return secured(await env.ASSETS.fetch(request));
 		const accept = request.headers.get("Accept") || "";
 		if (request.method === "GET" && accept.includes("text/html")) {
 			return new Response(null, { status: 302, headers: { Location: "/panana/login", "Cache-Control": "no-store" } });
