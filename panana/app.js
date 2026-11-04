@@ -452,6 +452,111 @@
 	NUM_WORDS[20] = "rua tekau"; NUM_IDS[20] = "tau-rua-tekau";
 	function knownNumbers() { var out = []; for (var n = 1; n <= 20; n++) if (CARD_BY_ID[NUM_IDS[n]] && known(NUM_IDS[n])) out.push(n); return out; }
 
+	// ---- 21–59 and telling the time (Taumata 4) ----------------------------
+	var TENS = ["", "tekau", "rua tekau", "toru tekau", "whā tekau", "rima tekau"];
+	var TENS_IDS = ["", "tau-tekau", "tau-rua-tekau", "tau2-toru-tekau", "tau2-whā-tekau", "tau2-rima-tekau"];
+	var TENS_EN = ["", "ten", "twenty", "thirty", "forty", "fifty"];
+	function numWord(n) {
+		if (n <= 20) return NUM_WORDS[n];
+		var t = Math.floor(n / 10), o = n % 10;
+		return TENS[t] + (o ? " mā " + NUM_WORDS[o] : "");
+	}
+	function numEn(n) {
+		if (n <= 20) return NUM_EN[n];
+		var t = Math.floor(n / 10), o = n % 10;
+		return TENS_EN[t] + (o ? "-" + NUM_EN[o] : "");
+	}
+	// a number counts as known if its own words are known (for 21+: the tens and the ones)
+	function knownNum(n) {
+		if (n <= 20) return !!CARD_BY_ID[NUM_IDS[n]] && known(NUM_IDS[n]);
+		var t = Math.floor(n / 10), o = n % 10;
+		return known(TENS_IDS[t]) && (o === 0 || known(NUM_IDS[o]));
+	}
+	function bigNumbers() { var out = []; for (var n = 21; n <= 59; n++) if (knownNum(n)) out.push(n); return out; }
+
+	// Times are { h: 0–23, m: 0–59 }. Up to half past: mai i te + this hour.
+	// After half past: (60 − m) ki te + the NEXT hour. Time of day:
+	// midnight–11:59 i te ata, 12–5:59 pm i te ahiahi, 6 pm on i te pō.
+	var PART_IDS = { ata: "tewa-i-te-ata", ahiahi: "tewa-i-te-ahiahi", "pō": "tewa-i-te-pō" };
+	function partOfDay(h) { return h < 12 ? "ata" : h < 18 ? "ahiahi" : "pō"; }
+	function hour12(h) { var x = h % 12; return x === 0 ? 12 : x; }
+	function timeSentence(t, opts) {
+		opts = opts || {};
+		var h = hour12(t.h), next = h === 12 ? 1 : h + 1, m = t.m, core;
+		if (m === 0) core = numWord(h) + " karaka";
+		else if (m === 15 && !opts.noQuarter) core = "hauwhā mai i te " + numWord(h) + " karaka";
+		else if (m === 30 && !opts.noQuarter) core = "haurua mai i te " + numWord(h) + " karaka";
+		else if (m === 45 && !opts.noQuarter) core = "hauwhā ki te " + numWord(next) + " karaka";
+		else if (m < 30) core = numWord(m) + " meneti mai i te " + numWord(h) + " karaka";
+		else core = numWord(60 - m) + " meneti ki te " + numWord(next) + " karaka";
+		var part = opts.part === undefined ? null : opts.part;
+		return "Ko te " + core + (part ? " i te " + part : "") + ".";
+	}
+	function timeEn(t, part) {
+		var h = hour12(t.h), next = h === 12 ? 1 : h + 1, m = t.m, core;
+		if (m === 0) core = numEn(h) + " o'clock";
+		else if (m === 15) core = "quarter past " + numEn(h);
+		else if (m === 30) core = "half past " + numEn(h);
+		else if (m === 45) core = "quarter to " + numEn(next);
+		else if (m < 30) core = plural(m, "minute").replace(/^\d+/, numEn(m)) + " past " + numEn(h);
+		else core = plural(60 - m, "minute").replace(/^\d+/, numEn(60 - m)) + " to " + numEn(next);
+		var pe = { ata: " in the morning", ahiahi: " in the afternoon", "pō": " at night" };
+		return "It's " + core + (part ? pe[part] : "") + ".";
+	}
+	function digital(t, noAmPm) { return hour12(t.h) + ":" + (t.m < 10 ? "0" : "") + t.m + (noAmPm ? "" : t.h < 12 ? " am" : " pm"); }
+	// An analogue clock face (inline SVG, follows the text colour)
+	function clockSvg(t, size) {
+		var hA = ((t.h % 12) + t.m / 60) * 30, mA = t.m * 6, ticks = "";
+		for (var i = 0; i < 12; i++) {
+			var a = i * 30 * Math.PI / 180, r1 = i % 3 === 0 ? 38 : 41;
+			ticks += '<line x1="' + (50 + r1 * Math.sin(a)).toFixed(1) + '" y1="' + (50 - r1 * Math.cos(a)).toFixed(1) + '" x2="' + (50 + 45 * Math.sin(a)).toFixed(1) + '" y2="' + (50 - 45 * Math.cos(a)).toFixed(1) + '" stroke-width="' + (i % 3 === 0 ? 3 : 1.5) + '"/>';
+		}
+		return '<svg class="clock" viewBox="0 0 100 100" width="' + (size || 150) + '" height="' + (size || 150) + '" role="img" aria-label="' + digital(t) + '">' +
+			'<circle cx="50" cy="50" r="47" fill="none" stroke="currentColor" stroke-width="3"/>' +
+			'<g stroke="currentColor" stroke-linecap="round">' + ticks +
+			'<line x1="50" y1="50" x2="50" y2="27" stroke-width="5" transform="rotate(' + hA.toFixed(1) + ' 50 50)"/>' +
+			'<line x1="50" y1="50" x2="50" y2="12" stroke-width="3" class="clock-min" transform="rotate(' + mA + ' 50 50)"/></g>' +
+			'<circle cx="50" cy="50" r="3.5" fill="currentColor"/></svg>';
+	}
+	// The class diagram: top karaka, bottom haurua, right half mai i te, left half ki te
+	function clockGuide() {
+		return '<div class="clock-guide" aria-label="Clock guide">' +
+			'<span class="cg-top">karaka</span><span class="cg-left">hauwhā<br>ki te</span>' + clockSvg({ h: 0, m: 0 }, 120) +
+			'<span class="cg-right">hauwhā<br>mai i te</span><span class="cg-bottom">haurua</span>' +
+			'<p class="muted small">Right-hand side (:01–:30) → <b>mai i te</b> this hour. Left-hand side (:31–:59) → <b>ki te</b> the next hour.</p></div>';
+	}
+	// Which minute values the learner can say, given what they know
+	function timeMinuteKinds() {
+		var kinds = [];
+		if (known("tewa-karaka")) kinds.push([0]);
+		if (known("tewa-haurua") && known("tewa-mai-i-te")) kinds.push([30]);
+		if (known("tewa-hauwhā") && known("tewa-mai-i-te")) kinds.push([15]);
+		if (known("tewa-hauwhā") && known("tewa-ki-te")) kinds.push([45]);
+		if (known("tewa-meneti")) {
+			var past = [], to = [];
+			for (var m = 1; m <= 59; m++) {
+				if (m === 15 || m === 30 || m === 45) continue;
+				if (m < 30 && known("tewa-mai-i-te") && knownNum(m)) past.push(m);
+				if (m > 30 && known("tewa-ki-te") && knownNum(60 - m)) to.push(m);
+			}
+			// mostly five-minute steps, sometimes any minute
+			var five = function (l) { return l.filter(function (x) { return x % 5 === 0; }); };
+			if (past.length) kinds.push(five(past).length && Math.random() < 0.7 ? five(past) : past);
+			if (to.length) kinds.push(five(to).length && Math.random() < 0.7 ? five(to) : to);
+		}
+		return kinds;
+	}
+	function knownHours() { var out = []; for (var h = 1; h <= 12; h++) if (knownNum(h)) out.push(h); return out; }
+	function randomTime() {
+		var hours = knownHours(), kinds = timeMinuteKinds();
+		var m = pick(pick(kinds));
+		var h12 = pick(m > 30 ? hours.filter(function (h) { return knownNum(h === 12 ? 1 : h + 1); }) : hours) || pick(hours);
+		var pm = Math.random() < 0.5;
+		var h = (h12 % 12) + (pm ? 12 : 0);
+		return { h: h, m: m };
+	}
+	function knownParts() { return Object.keys(PART_IDS).filter(function (k) { return known(PART_IDS[k]); }); }
+
 	var COLOUR_IDS = ["tae-whero", "tae-karaka", "tae-kōwhai", "tae-kākāriki", "tae-kikorangi", "tta-waiporoporo", "tae-parauri", "tae-pango", "tae-mā", "tae-māwhero"];
 	// [picture, shape card, colour card, shape in English]
 	var COLOUR_SHAPES = [];
@@ -655,6 +760,13 @@
 				var cmdThings = [].concat.apply([], Object.keys(CMD_THINGS).map(function (k) { return knownIds(CMD_THINGS[k].things); }));
 				return { ok: COMMANDS.filter(function (c) { return known(c[0]); }).length >= 3 && cmdThings.length >= 2 && known("hua-te") && known("hua-ngā"),
 					need: "Learn 3 commands, te and ngā, and 2 things (kapu, pereti…) first." };
+			case "bigNumber":
+				return { ok: TENS_IDS.slice(2).filter(known).length >= 2 && knownNumbers().filter(function (n) { return n < 10; }).length >= 4,
+					need: "Learn two of rua tekau / toru tekau / whā tekau / rima tekau, and the numbers 1–9, first." };
+			case "time":
+			case "timeRead":
+				return { ok: known("tewa-karaka") && knownHours().length >= 3 && timeMinuteKinds().length >= 1,
+					need: "Learn karaka (o'clock) and a few numbers 1–12 first." };
 			case "tokohia":
 				var ppl = PEOPLE.filter(function (x) { return known(x[0]); }).length;
 				return { ok: nums >= 3 && ppl >= 2, need: "Learn 3 numbers and 2 people words (Te Whānau) first." };
@@ -924,6 +1036,71 @@
 			}
 			var picC = th.pic || "";
 			q = { visual: many ? picC + picC : picC, many: many, ask: "Say: " + enC, answer: ansC, wrong: wrongC, en: enC };
+		}
+		if (card.gen === "bigNumber") {
+			var bn = pick(bigNumbers().length ? bigNumbers() : [20]);
+			var bt = Math.floor(bn / 10), bo = bn % 10;
+			var wrongB = [];
+			if (bo) {
+				wrongB.push(TENS[bt] + " " + NUM_WORDS[bo]); // forgot mā
+				if (bo >= 2 && bo <= 5) wrongB.push(TENS[bo] + " mā " + NUM_WORDS[bt]); // tens and ones swapped
+				wrongB.push(NUM_WORDS[bt] + " mā " + NUM_WORDS[bo] + " tekau");
+			}
+			[bn - 10, bn + 10, bn + 1, bn - 1, bn + 2].forEach(function (x) { if (x >= 20 && x <= 59 && x !== bn) wrongB.push(numWord(x)); });
+			q = { visual: '<span class="big-num">' + bn + "</span>", ask: "He aha tēnei tau?", answer: numWord(bn), wrong: wrongB, mcOnly: true,
+				en: bn + " = " + numEn(bn) + "." };
+		} else if (card.gen === "time" || card.gen === "timeRead") {
+			var tt = randomTime();
+			var parts = knownParts(), part = parts.length && Math.random() < 0.65 ? partOfDay(tt.h) : null;
+			if (part && parts.indexOf(part) === -1) part = null;
+			var ansT = timeSentence(tt, { part: part });
+			var h12t = hour12(tt.h), nextT = h12t === 12 ? 1 : h12t + 1, prevT = h12t === 1 ? 12 : h12t - 1;
+			var wrongT = [];
+			var p = part ? " i te " + part : "";
+			if (tt.m === 0) {
+				wrongT.push("Ko te " + numWord(nextT) + " karaka" + p + ".", "Ko te " + numWord(prevT) + " karaka" + p + ".", "Ko te haurua mai i te " + numWord(h12t) + " karaka" + p + ".");
+			} else if (tt.m <= 30) {
+				var mw = tt.m === 15 ? "hauwhā" : tt.m === 30 ? "haurua" : numWord(tt.m) + " meneti";
+				wrongT.push("Ko te " + mw + " ki te " + numWord(h12t) + " karaka" + p + "."); // past/to swapped
+				wrongT.push("Ko te " + mw + " mai i te " + numWord(nextT) + " karaka" + p + "."); // wrong hour
+				if (tt.m === 15) wrongT.push("Ko te haurua mai i te " + numWord(h12t) + " karaka" + p + ".");
+				if (tt.m === 30) wrongT.push("Ko te hauwhā mai i te " + numWord(h12t) + " karaka" + p + ".");
+			} else {
+				var left = 60 - tt.m, lw = tt.m === 45 ? "hauwhā" : numWord(left) + " meneti";
+				wrongT.push("Ko te " + lw + " ki te " + numWord(h12t) + " karaka" + p + "."); // forgot to use the next hour
+				wrongT.push("Ko te " + lw + " mai i te " + numWord(nextT) + " karaka" + p + "."); // past/to swapped
+				if (tt.m !== 45 && tt.m <= 59) wrongT.push("Ko te " + numWord(tt.m) + " meneti ki te " + numWord(nextT) + " karaka" + p + "."); // didn't subtract from 60
+				if (tt.m === 45) wrongT.push("Ko te hauwhā mai i te " + numWord(h12t) + " karaka" + p + ".");
+			}
+			// fillers: the hour before, or five minutes out
+			var mcount = tt.m <= 30 ? tt.m : 60 - tt.m, dir = tt.m <= 30 ? " mai i te " : " ki te ", hr = tt.m <= 30 ? h12t : nextT;
+			var prevHr = hr === 1 ? 12 : hr - 1;
+			if (tt.m === 0) wrongT.push("Ko te " + numWord(h12t === 1 ? 11 : h12t === 2 ? 12 : h12t - 2) + " karaka" + p + ".");
+			else {
+				var mwF = tt.m === 15 || tt.m === 45 ? "hauwhā" : tt.m === 30 ? "haurua" : numWord(mcount) + " meneti";
+				wrongT.push("Ko te " + mwF + dir + numWord(prevHr) + " karaka" + p + ".");
+				[mcount + 5, mcount - 5].forEach(function (x) { if (x >= 1 && x <= 29 && x !== 15) wrongT.push("Ko te " + numWord(x) + " meneti" + dir + numWord(hr) + " karaka" + p + "."); });
+			}
+			if (part) {
+				var other = pick(["ata", "ahiahi", "pō"].filter(function (x) { return x !== part; }));
+				wrongT.push(ansT.replace(" i te " + part + ".", " i te " + other + "."));
+			}
+			wrongT = wrongT.filter(function (w) { return w !== ansT; });
+			if (card.gen === "time") {
+				q = { visual: clockSvg(tt) + '<div class="digital">' + digital(tt, !part) + "</div>", ask: "Ko te aha te wā?", answer: ansT, wrong: wrongT,
+					en: digital(tt, !part) + " — " + timeEn(tt, part), alts: [ansT.replace(/\.$/, " te wā.")] };
+			} else {
+				// read it: hear the sentence, choose the clock time
+				var cand = [];
+				var add = function (x) { x = { h: (x.h + 24) % 24, m: x.m }; var d = digital(x, !part); if (d !== digital(tt, !part) && cand.indexOf(d) === -1) cand.push(d); };
+				if (tt.m === 0) { add({ h: tt.h + 1, m: 0 }); add({ h: tt.h - 1, m: 0 }); add({ h: tt.h, m: 30 }); }
+				else if (tt.m < 30 || tt.m === 30) { add({ h: tt.h - 1, m: 60 - tt.m }); add({ h: tt.h + 1, m: tt.m }); add({ h: tt.h, m: 60 - tt.m }); }
+				else { add({ h: tt.h, m: 60 - tt.m }); add({ h: tt.h + 1, m: 60 - tt.m }); add({ h: tt.h - 1, m: tt.m }); }
+				if (part) add({ h: tt.h + 12, m: tt.m });
+				add({ h: tt.h, m: (tt.m + 5) % 60 });
+				q = { visual: "🕰️", text: ansT, ask: "He aha te wā?", answer: digital(tt, !part), wrong: cand, mcOnly: true, sayText: ansT,
+					en: ansT + " = " + digital(tt, !part) + " — " + timeEn(tt, part) };
+			}
 		}
 		if (!q) return null;
 		q.options = optionSet(q.answer, q.wrong);
@@ -1585,6 +1762,7 @@
 		if (!card.gen && !card.pattern) html += '<div class="sayit-row">' + sayIt(card.mi, "How to say it") + "</div>";
 		if (card.pic && !(session && session.current && session.current.ex === "intro")) html += '<div class="pic small-pic" aria-hidden="true">' + card.pic + "</div>";
 		if (card.note) html += '<p class="note">' + esc(card.note) + "</p>";
+		if (card.gen === "time" || card.gen === "timeRead") html += clockGuide();
 		if (card.ex) html += '<p class="ex"><b>' + esc(card.ex) + "</b><br><span class=\"muted\">" + esc(card.exEn) + "</span></p>";
 		if (!card.gen) html += '<a class="teaka" href="' + teAkaUrl(card) + '" target="_blank" rel="noopener">Look up “' + esc(card.lookup) + '” in Te Aka ↗</a>';
 		html += "</div>";
@@ -1686,7 +1864,7 @@
 		return '<div class="feedback ' + (cur.correct ? "good" : "bad") + anim + '" role="status">' +
 			'<div class="fb-top"><div class="fb-msg">' + msg + "</div></div>" +
 			'<div class="fb-answer"><span><b>' + esc(q.ask) + " " + esc(q.answer) + "</b></span></div>" +
-			'<div class="sayit-row">' + sayIt(q.answer, "How to say the answer") + "</div>" +
+			'<div class="sayit-row">' + sayIt(q.sayText || q.answer, "How to say the answer") + "</div>" +
 			'<p class="fb-note">' + esc(q.en) + "</p>" +
 			(q.alts && q.alts.length ? '<p class="fb-note">Also correct: ' + esc(q.alts[0]) + "</p>" : "") +
 			(cur.correct ? "" : '<p class="fb-note">Pattern: ' + esc(cur.card.mi) + "</p>") +
