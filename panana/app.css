@@ -491,3 +491,15 @@ summary { cursor: pointer; color: var(--brand-text); font-weight: 600; padding: 
 .btn.danger-fill:disabled { opacity: .4; cursor: not-allowed; }
 @keyframes ds-up { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes ds-fade { from { opacity: 0; } to { opacity: 1; } }
+
+/* Telling the time */
+.gen-visual .clock { display: block; margin: 0 auto; color: var(--text, currentColor); }
+.clock .clock-min { stroke: var(--accent); }
+.gen-visual .digital { font-size: 1.1rem; font-weight: 700; color: var(--muted); margin-top: 4px; letter-spacing: .04em; }
+.gen-visual .big-num { font-size: 4rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.clock-guide { display: grid; grid-template-columns: 1fr auto 1fr; grid-template-areas: ". top ." "left clock right" ". bottom ." "note note note";
+	align-items: center; justify-items: center; gap: 4px 10px; margin: 12px 0 4px; padding: 12px; border-radius: 14px; background: var(--surface-2); font-weight: 700; }
+.clock-guide .clock { grid-area: clock; }
+.clock-guide .cg-top { grid-area: top; } .clock-guide .cg-bottom { grid-area: bottom; }
+.clock-guide .cg-left { grid-area: left; text-align: right; justify-self: end; } .clock-guide .cg-right { grid-area: right; text-align: left; justify-self: start; }
+.clock-guide p { grid-area: note; margin: 6px 0 0; font-weight: 400; text-align: center; }
