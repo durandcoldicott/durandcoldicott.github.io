@@ -12,9 +12,14 @@
 	// the service worker helps the browser treat Panana as installable
 	if ("serviceWorker" in navigator) navigator.serviceWorker.register("/panana/sw.js").catch(function () {});
 
-	// Already signed in? Go straight to the app.
+	// Invited to a rōpū? (/panana/join/CODE sends people here with ?join=CODE)
+	var joinMatch = /[?&]join=([A-Za-z0-9-]+)/.exec(location.search);
+	var JOIN = joinMatch ? joinMatch[1].toUpperCase() : "";
+	var APP = "/panana/" + (JOIN ? "?join=" + JOIN : "");
+
+	// Already signed in? Go straight to the app (and into the rōpū).
 	fetch("/api/reo/me", { credentials: "same-origin" })
-		.then(function (r) { if (r.ok) location.replace("/panana/"); })
+		.then(function (r) { if (r.ok) location.replace(APP); })
 		.catch(function () {});
 
 	// "Save as a web app" strip (same rule and dismissal as inside the app)
@@ -46,6 +51,25 @@
 			forms.join.hidden = tab !== "join";
 		});
 	});
+
+	if (JOIN) {
+		var shown = JOIN.length > 4 && JOIN.indexOf("-") === -1 ? JOIN.slice(0, -4) + "-" + JOIN.slice(-4) : JOIN;
+		var banner = document.createElement("p");
+		banner.className = "card center invite-banner";
+		banner.textContent = "Checking your invite…";
+		document.querySelector(".auth-tabs").before(banner);
+		fetch("/api/reo/public/group?code=" + encodeURIComponent(JOIN), { credentials: "same-origin" })
+			.then(function (r) { return r.json().then(function (b) { return { ok: r.ok, b: b }; }); })
+			.then(function (x) {
+				if (!x.ok) { banner.textContent = x.b.error || "That invite link isn't valid any more."; return; }
+				banner.innerHTML = "";
+				var b = document.createElement("b"); b.textContent = x.b.name;
+				banner.append("🎉 You're invited to join ", b, x.b.open ? ". Already have an account? Sign in. New here? Tap Join." : " — but it isn't taking new members right now.");
+				var input = document.querySelector('#join-form [name=invite]');
+				if (input && !input.value) input.value = shown;
+			})
+			.catch(function () { banner.textContent = "Can't check the invite right now."; });
+	}
 
 	// After deleting an account
 	if (/[?&]deleted=1/.test(location.search)) {
@@ -100,7 +124,7 @@
 						try { localStorage.setItem("reo.lastUser", JSON.stringify(body)); } catch (x) {}
 						// new members on a phone: offer to add Panana to the home screen first
 						if (endpoint === "register" && (IOS || ANDROID) && !INSTALLED) showInstallStep(body.username);
-						else location.replace("/panana/");
+						else location.replace(endpoint === "register" ? "/panana/" : APP);
 					});
 				})
 				.catch(function (x) {

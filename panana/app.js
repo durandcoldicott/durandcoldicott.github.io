@@ -1699,7 +1699,7 @@
 		var synced = offline ? "Offline — will sync when you reconnect" : lastSync ? "Synced " + ago(lastSync) : "Not synced yet";
 		var account = '<section class="card"><h2>Kia ora, ' + esc(user ? user.name : "") + '</h2>' +
 			'<p class="muted small">Signed in as @' + esc(user ? user.username : "") + " · " + synced + "</p>" +
-			'<div class="toggle-row"><span>Show me on the group leaderboard<br><span class="muted small">On by default. Rather practise privately? Turn it off — you\'ll still see the board, others just won\'t see you. (Group admins can always see member activity.)</span></span>' +
+			'<div class="toggle-row"><span>Show me on leaderboards<br><span class="muted small">On by default, for your rōpū and Everyone. Rather practise privately? Turn it off — you\'ll still see the boards, others just won\'t see you. (The site admin can always see member activity.)</span></span>' +
 			'<button class="chip' + (state.settings.hideFromBoard ? "" : " active") + '" data-action="toggle-board">' + (state.settings.hideFromBoard ? "Hidden" : "Shown") + "</button></div>" +
 			'<details><summary>Change password</summary><form id="password-form" class="mini-form">' +
 			'<input name="current" type="password" autocomplete="current-password" placeholder="Current password" required>' +
@@ -1993,7 +1993,8 @@
 				view = el.getAttribute("data-tab");
 				topicView = null;
 				render();
-				if (view === "ropu" || view === "home") refreshBoard();
+				if (view === "ropu") { loadGroups().then(function () { refreshBoard(true); if (!session && view === "ropu") render(true); }); }
+				else if (view === "home") refreshBoard();
 				if (view === "more" && user && user.admin) loadAdmin();
 				if (view === "more") loadPush();
 				break;
@@ -2005,6 +2006,50 @@
 				render(true);
 				break;
 			case "logout": logout(); break;
+			case "pick-board": setBoard(el.getAttribute("data-id")); break;
+			case "share-group": if (currentGroup()) shareGroup(currentGroup()); break;
+			case "group-close": {
+				var gc = currentGroup();
+				api("POST", "groups/close", { id: gc.id, closed: !gc.closed }).then(function (r) { if (groupDone(r, r.ok && r.data.group.closed ? "Not taking new members." : "Open to new members.")) afterGroupChange(gc.id); });
+				break;
+			}
+			case "group-newcode": {
+				var gn = currentGroup();
+				api("POST", "groups/newcode", { id: gn.id }).then(function (r) { if (groupDone(r, "New invite code ready — the old one stops working.")) afterGroupChange(gn.id); });
+				break;
+			}
+			case "group-remove": {
+				var gr = currentGroup(), who2 = el.getAttribute("data-u");
+				dangerConfirm({ title: "Remove @" + who2 + " from “" + gr.name + "”?", body: "They'll leave this rōpū's board. Their account and progress are untouched.", word: who2, button: "Remove from rōpū" },
+					function (done, d, fail) {
+						api("POST", "groups/remove", { id: gr.id, username: who2 }).then(function (r) { if (!r.ok) return fail(r.data.error || "Couldn't remove."); done(); toast("Removed @" + who2 + "."); afterGroupChange(gr.id); });
+					});
+				break;
+			}
+			case "group-delete": {
+				var gd = currentGroup();
+				dangerConfirm({ title: "Delete “" + gd.name + "”?", body: "The rōpū and its board are deleted for everyone in it. Members keep their accounts and progress.", word: gd.name, button: "Delete rōpū" },
+					function (done, d, fail) {
+						api("POST", "groups/delete", { id: gd.id, confirm: d.word }).then(function (r) { if (!r.ok) return fail(r.data.error || "Couldn't delete."); done(); toast("Rōpū deleted."); boardId = ""; afterGroupChange(); });
+					});
+				break;
+			}
+			case "group-leave": {
+				var gl = currentGroup();
+				dangerConfirm({ title: "Leave “" + gl.name + "”?", body: gl.owner ? (gl.count > 1 ? "Someone else in the rōpū will take over running it. You can rejoin with the invite code." : "You're the only member, so the rōpū will be deleted.") : "You'll stop seeing its board. You can rejoin with the invite code.", word: "LEAVE", button: "Leave rōpū" },
+					function (done, d, fail) {
+						api("POST", "groups/leave", { id: gl.id }).then(function (r) { if (!r.ok) return fail(r.data.error || "Couldn't leave."); done(); toast("You've left “" + gl.name + "”."); boardId = ""; afterGroupChange(); });
+					});
+				break;
+			}
+			case "admin-group-delete": {
+				var gid = el.getAttribute("data-id"), gname = el.getAttribute("data-name");
+				dangerConfirm({ title: "Delete rōpū “" + gname + "”?", body: "Site admin: removes this rōpū for everyone in it. Their accounts are untouched.", word: gname, button: "Delete rōpū" },
+					function (done, d, fail) {
+						api("POST", "groups/delete", { id: gid, confirm: d.word }).then(function (r) { if (!r.ok) return fail(r.data.error || "Couldn't delete."); done(); toast("Rōpū deleted."); loadAdmin(); afterGroupChange(); });
+					});
+				break;
+			}
 			case "signout-others":
 				api("POST", "account/signout-others", {}).then(function (r) {
 					toast(r.ok ? "Signed out on every other device." : r.data.error || "Couldn't do that.");
@@ -2152,6 +2197,14 @@
 			sendFeedback({ kind: "correction", message: rd.message, about: ctxR.about, card: ctxR.card }, form);
 		} else if (form.id === "password-form") changePassword(form);
 		else if (form.id === "admin-form") adminReset(form);
+		else if (form.id === "group-create") {
+			api("POST", "groups/create", { name: formData(form).name }).then(function (r) { if (groupDone(r, "🎉 “" + r.data.group.name + "” is ready — share the invite to get people in.")) afterGroupChange(r.data.group.id); });
+		} else if (form.id === "group-join") {
+			api("POST", "groups/join", { code: formData(form).code }).then(function (r) { if (groupDone(r, r.data.already ? "You're already in “" + r.data.group.name + "”." : "🎉 You've joined “" + r.data.group.name + "”!")) afterGroupChange(r.data.group.id); });
+		} else if (form.id === "group-rename") {
+			var gRen = currentGroup();
+			api("POST", "groups/rename", { id: gRen.id, name: formData(form).name }).then(function (r) { if (groupDone(r, "Renamed.")) afterGroupChange(gRen.id); });
+		}
 		else onType(false);
 	});
 
@@ -2620,8 +2673,10 @@
 		return html + "</ul>";
 	}
 
+	var adminGroups = null;
 	function loadAdmin() {
 		loadAdminFeedback();
+		api("GET", "admin/groups").then(function (r) { if (r.ok) { adminGroups = r.data.groups; if (!session && view === "more") render(true); } }).catch(function () {});
 		api("GET", "admin/members").then(function (r) {
 			if (!r.ok) { adminError = r.data.error || "Couldn't load members."; }
 			else { adminData = r.data; adminError = ""; user.invite = r.data.config.invite; }
@@ -2668,7 +2723,7 @@
 		html += '<div class="admin-row"><div><div class="eyebrow">Invite code</div>' +
 			(c.closed ? '<span class="muted">Sign-ups closed</span>' : c.invite ? '<code class="invite">' + esc(c.invite) + "</code>" : '<span class="muted">None set</span>') + "</div>" +
 			'<button class="btn" data-action="admin-newcode">New code</button></div>' +
-			'<p class="muted small">Friends sign up at durand.nz/panana with this code (install guide: durand.nz/panana/install). If it gets shared too widely, make a new one — the old code stops working, and existing members keep their accounts.</p>' +
+			'<p class="muted small">The site invite code: people who sign up with it join “Our class”. Any rōpū\'s own invite code also lets new people sign up. If a code gets shared too widely, make a new one — existing members keep their accounts.</p>' +
 			'<div class="toggle-row"><span>Allow new sign-ups</span><button class="chip' + (c.closed ? "" : " active") + '" data-action="admin-closed">' + (c.closed ? "Closed" : "Open") + "</button></div>" +
 			'<div class="toggle-row"><span>Member limit</span><span class="choices tight">' + [10, 25, 50].map(function (n) {
 				return '<button class="chip' + (c.max === n ? " active" : "") + '" data-action="admin-max" data-max="' + n + '">' + n + "</button>";
@@ -2690,6 +2745,11 @@
 		});
 		html += "</ul>";
 		html += renderAdminFeedback();
+		html += '<details><summary>All rōpū <span class="muted small">(' + (adminGroups ? adminGroups.length : "…") + ")</span></summary>" +
+			(adminGroups ? '<ul class="members">' + adminGroups.map(function (g) {
+				return '<li class="member"><div class="member-main"><strong>' + esc(g.name) + '</strong><div class="muted small">' + plural(g.count, "member") + " · owner @" + esc(g.owner) + "</div></div>" +
+					'<button class="btn danger-sm" data-action="admin-group-delete" data-id="' + esc(g.id) + '" data-name="' + esc(g.name) + '">Delete</button></li>';
+			}).join("") + "</ul>" : "") + "</details>";
 		html += '<details><summary>Reset a member\'s password</summary><form id="admin-form" class="mini-form">' +
 			'<input name="username" autocapitalize="none" autocorrect="off" placeholder="Their username" required>' +
 			'<input name="password" type="text" minlength="8" placeholder="New password (8+ characters)" required>' +
@@ -2700,20 +2760,51 @@
 	// ---------------------------------------------------------------------
 	// Group leaderboard
 	// ---------------------------------------------------------------------
-	var board = null;      // other members' summaries from the server
+	var board = null;      // the chosen board's member summaries from the server
 	var boardAt = 0;
 	var boardMetric = "week";
+	var groups = null;     // rōpū this person is in
+	var groupLimits = {};
+	var BOARD_KEY = "panana.board";
+	var boardId = (function () { try { return localStorage.getItem(BOARD_KEY) || ""; } catch (e) { return ""; } })();
 
+	function currentGroup() { return (groups || []).filter(function (g) { return g.id === boardId; })[0] || null; }
+	function setBoard(id) {
+		boardId = id;
+		try { localStorage.setItem(BOARD_KEY, id); } catch (e) {}
+		board = null;
+		refreshBoard(true);
+		render(true);
+	}
+	function loadGroups() {
+		if (!user || offline) return Promise.resolve();
+		return api("GET", "groups").then(function (r) {
+			if (!r.ok) return;
+			groups = r.data.groups || [];
+			groupLimits = r.data.limits || {};
+			// default to your first rōpū; fall back to Everyone if you left the chosen one
+			if (!boardId || (boardId !== "all" && !currentGroup())) {
+				var nb = groups.length ? groups[0].id : "all";
+				if (nb !== boardId) { boardId = nb; board = null; boardAt = 0; }
+			}
+		}).catch(function () {});
+	}
 	function refreshBoard(force) {
 		if (!user || (!force && Date.now() - boardAt < 60000)) return;
 		boardAt = Date.now();
-		api("GET", "leaderboard").then(function (r) {
-			if (!r.ok) return;
-			board = r.data.members || [];
-			checkWeekWin();
-			if (!session && (view === "home" || view === "ropu")) render(true);
+		var ready = groups ? Promise.resolve() : loadGroups();
+		ready.then(function () {
+			var id = boardId || "all";
+			return api("GET", "leaderboard" + (id === "all" ? "" : "?group=" + encodeURIComponent(id))).then(function (r) {
+				if (id !== (boardId || "all")) return; // switched while loading
+				if (!r.ok) { if (r.status === 404) { boardId = "all"; boardAt = 0; refreshBoard(true); } return; }
+				board = r.data.members || [];
+				checkWeekWin();
+				if (!session && (view === "home" || view === "ropu")) render(true);
+			});
 		}).catch(function () {});
 	}
+	function boardName() { var g = currentGroup(); return g ? g.name : "Everyone"; }
 
 	function boardRows() {
 		var t = todayKey(), wk = weekStart(t), pwk = addDays(wk, -7), yest = addDays(t, -1);
@@ -2774,13 +2865,76 @@
 			var ahead = rows[i - 1];
 			line = "#" + (i + 1) + " of " + rows.length + " · " + (ahead.week - me.week || "a few") + " XP behind " + esc(ahead.n);
 		}
-		return '<button class="card standing" data-action="tab" data-tab="ropu"><span class="standing-icon">' + (i === 0 ? "🥇" : "🏅") + '</span><span><span class="eyebrow">Rōpū this week</span><br>' + line + '</span><span class="chev">›</span></button>';
+		return '<button class="card standing" data-action="tab" data-tab="ropu"><span class="standing-icon">' + (i === 0 ? "🥇" : "🏅") + '</span><span><span class="eyebrow">' + esc(boardName()) + ' · this week</span><br>' + line + '</span><span class="chev">›</span></button>';
+	}
+
+	function joinLink(g) { return location.origin + "/panana/join/" + encodeURIComponent(g.code); }
+	function renderGroupCard() {
+		var g = currentGroup();
+		if (!g) return '<section class="card"><h2>🌏 Everyone</h2><p class="muted small">Everyone using Panana who hasn\'t hidden themselves. For a private league with people you know, make a rōpū and share its invite.</p></section>';
+		var html = '<section class="card group-card"><h2>' + esc(g.name) + '</h2><p class="muted small">' + plural(g.count, "member") + (g.owner ? " · you run this rōpū" : " · run by @" + esc(g.ownerName)) + (g.closed ? " · not taking new members" : "") + "</p>";
+		if (!g.closed) {
+			html += '<div class="invite-box"><div><div class="eyebrow">Invite code</div><code class="invite">' + esc(g.code) + '</code></div>' +
+				'<button class="btn primary" data-action="share-group">📨 Share invite</button></div>' +
+				'<p class="muted small">Friends tap the link, sign up (or sign in) and land in this rōpū. They can also type the code in the Join box.</p>';
+		}
+		if (g.owner) {
+			html += '<details><summary>Manage rōpū</summary>' +
+				'<form id="group-rename" class="mini-form"><input name="name" maxlength="40" value="' + esc(g.name) + '" required><button class="btn" type="submit">Rename</button></form>' +
+				'<div class="toggle-row"><span>Taking new members</span><button class="chip' + (g.closed ? "" : " active") + '" data-action="group-close">' + (g.closed ? "Closed" : "Open") + "</button></div>" +
+				'<div class="toggle-row"><span>Invite code shared too widely?</span><button class="btn" data-action="group-newcode">New code</button></div>' +
+				'<h3 class="members-title">Members</h3><ul class="members">' + (g.members || []).map(function (u) {
+					return '<li class="member"><span class="avatar">' + esc(u.charAt(0).toUpperCase()) + '</span><div class="member-main"><strong>@' + esc(u) + "</strong>" + (u === user.username ? ' <span class="pill">you</span>' : "") + "</div>" +
+						(u === user.username ? "" : '<button class="btn danger-sm" data-action="group-remove" data-u="' + esc(u) + '">Remove</button>') + "</li>";
+				}).join("") + "</ul>" +
+				'<button class="btn danger" data-action="group-delete">Delete rōpū…</button></details>';
+		}
+		html += '<button class="btn" data-action="group-leave">Leave rōpū</button></section>';
+		return html;
+	}
+	function renderGroupForms() {
+		return '<section class="card"><h2>Ō rōpū <span class="muted small">Your rōpū</span></h2>' +
+			'<form id="group-join" class="mini-form"><label class="small">Join with a code<input name="code" autocapitalize="characters" autocorrect="off" spellcheck="false" placeholder="e.g. KAHA-7Q2M" required></label><button class="btn" type="submit">Join</button></form>' +
+			'<form id="group-create" class="mini-form"><label class="small">Start a new rōpū<input name="name" maxlength="40" placeholder="e.g. Te Reo Tuesday, Whānau" required></label><button class="btn primary" type="submit">＋ Create rōpū</button></form>' +
+			'<p class="muted small">Only people in a rōpū see its board. You can be in up to ' + (groupLimits.joined || 20) + " and run up to " + (groupLimits.owned || 5) + "; each holds " + (groupLimits.members || 50) + " people.</p></section>";
+	}
+	function groupDone(r, msg) {
+		if (!r.ok) { toast(r.data.error || "Couldn't do that."); return false; }
+		if (msg) toast(msg);
+		return true;
+	}
+	function afterGroupChange(selectId) {
+		groups = null;
+		loadGroups().then(function () { if (selectId) setBoard(selectId); else { board = null; refreshBoard(true); render(true); } });
+	}
+	function shareGroup(g) {
+		var link = joinLink(g), text = "Join my rōpū “" + g.name + "” on Panana and practise te reo Māori with me! " + link;
+		if (navigator.share) { navigator.share({ title: "Panana · " + g.name, text: text, url: link }).catch(function () {}); return; }
+		(navigator.clipboard ? navigator.clipboard.writeText(link) : Promise.reject()).then(function () { toast("Invite link copied."); })
+			.catch(function () { prompt("Copy this invite link:", link); });
+	}
+	// Arriving from an invite link: /panana/?join=CODE
+	function handleJoinLink() {
+		var m = /[?&]join=([A-Za-z0-9-]+)/.exec(location.search);
+		if (!m || offline) return;
+		var code = m[1];
+		try { history.replaceState(null, "", location.pathname); } catch (e) {}
+		api("POST", "groups/join", { code: code }).then(function (r) {
+			if (!r.ok) { toast(r.data.error || "Couldn't join that rōpū."); return; }
+			toast(r.data.already ? "You're already in “" + r.data.group.name + "”." : "🎉 You've joined “" + r.data.group.name + "”!");
+			view = "ropu";
+			afterGroupChange(r.data.group.id);
+		}).catch(function () {});
 	}
 
 	function renderRopu() {
 		var metrics = [["week", "This week"], ["streak", "Streaks"], ["words", "Words"], ["xp", "All-time"]];
 		var units = { week: "XP", streak: "days", words: "words", xp: "XP" };
-		var html = '<main class="page"><h1>Rōpū <span class="muted small">Your group</span></h1>';
+		var html = '<main class="page"><h1>Rōpū <span class="muted small">Your groups</span></h1>';
+		// which board: each rōpū, then Everyone
+		html += '<div class="choices board-pick" role="tablist">' + (groups || []).map(function (g) {
+			return '<button class="chip' + (boardId === g.id ? " active" : "") + '" data-action="pick-board" data-id="' + esc(g.id) + '">' + esc(g.name) + "</button>";
+		}).join("") + '<button class="chip' + (boardId === "all" || !boardId ? " active" : "") + '" data-action="pick-board" data-id="all">🌏 Everyone</button></div>';
 		var w = lastWeekWinner();
 		if (w) html += '<div class="banner">🏆 Last week: <b>' + esc(w.n) + "</b> won with " + w.last + " XP" + (w.me ? " — that's you!" : "") + "</div>";
 		html += '<div class="choices">' + metrics.map(function (m) {
@@ -2801,15 +2955,16 @@
 					'<span class="score"><strong>' + r[boardMetric] + "</strong><small>" + units[boardMetric] + "</small></span></li>";
 			});
 			html += "</ol>";
-			if (rows.length < 2) html += '<p class="muted">It\'s just you so far. Share the invite code and durand.nz/panana with friends to get a league going.</p>';
+			if (rows.length < 2) html += '<p class="muted">It\'s just you so far. Share your rōpū invite below to get a league going.</p>';
 			if (boardMetric === "week") {
 				var left = 7 - dayOfWeek(todayKey());
 				html += '<p class="muted small center">The weekly league resets on Monday · ' + (left === 1 ? "last day!" : left + " days left") + "</p>";
 			}
 		}
 		html += state.settings.hideFromBoard
-			? '<p class="muted small center">🙈 You\'re hidden from the board — others can\'t see you. <button class="link-btn" data-action="toggle-board">Show me again</button></p>'
-			: '<p class="muted small center">Rather practise privately? <button class="link-btn" data-action="toggle-board">Hide me from the board</button></p>';
+			? '<p class="muted small center">🙈 You\'re hidden from every board — others can\'t see you. <button class="link-btn" data-action="toggle-board">Show me again</button></p>'
+			: '<p class="muted small center">Rather practise privately? <button class="link-btn" data-action="toggle-board">Hide me from the boards</button></p>';
+		html += renderGroupCard() + renderGroupForms();
 		html += "</main>";
 		return html;
 	}
@@ -2847,7 +3002,7 @@
 		}).then(function () {
 			reconcileFreezes();
 			render();
-			refreshBoard(true);
+			loadGroups().then(function () { refreshBoard(true); handleJoinLink(); });
 		}).catch(function (e) {
 			if (e instanceof AuthError) return;
 			root.innerHTML = '<main class="page"><h1>Panana</h1><p>You\'re offline and haven\'t signed in on this device yet. Connect to the internet and try again.</p></main>';

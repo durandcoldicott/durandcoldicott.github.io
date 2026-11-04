@@ -15,6 +15,11 @@
  *   reo:vapid                push-notification signing keys (made on first use)
  *   reo:push:<username>      { subs: [push subscriptions], time, tz, streak, weekly, last… }
  *   reo:fb:<time>-<random>   feedback / corrections from members (+ metadata for the admin list)
+ *   reo:group:<id>           { id, name, owner, code, closed, created, members: [usernames] }
+ *                            + metadata { n, o, k } (name, owner, member count) for the admin list
+ *   reo:gcode:<CODE>         the group id for a join code
+ *   reo:ug:<username>        [group ids] the member belongs to
+ *   reo:groupsinit           set once the original class has been moved into its own group
  *
  * Configuration (set as *Secrets* in the Cloudflare dashboard so a
  * `wrangler deploy` doesn't wipe them):
@@ -33,6 +38,9 @@ const PBKDF2_ITER = 100000; // the Workers runtime maximum
 const MAX_FAILS = 10;
 const MAX_STATE_BYTES = 600000;
 const DEFAULT_MAX_MEMBERS = 25;
+const GROUP_MAX_MEMBERS = 50; // people in one rōpū
+const MAX_OWNED_GROUPS = 5;   // rōpū one person can create
+const MAX_JOINED_GROUPS = 20; // rōpū one person can be in
 
 // Served at the old /reo/sw.js (see handlePanana).
 const RETIRE_OLD_SW = `
@@ -304,6 +312,176 @@ function cleanSummary(s) {
 }
 
 // ---------------------------------------------------------------------------
+// Rōpū (groups): private leaderboards people make and share with a join code.
+// ---------------------------------------------------------------------------
+const CODE_WORDS = ["KAHA", "ORA", "PAI", "RAWE", "MAIA", "AROHA", "TAUTOKO", "MANA", "TIKA", "KOHA", "WAIRUA", "HARIKOA"];
+const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no 0/O or 1/I
+function cleanCode(c) { return String(c || "").toUpperCase().replace(/[^A-Z0-9]/g, ""); }
+function cleanGroupName(s) { return String(s || "").replace(/[\u0000-\u001f<>]/g, "").replace(/\s+/g, " ").trim().slice(0, 40); }
+async function newGroupCode(kv) {
+	for (let i = 0; i < 10; i++) {
+		const r = crypto.getRandomValues(new Uint8Array(5));
+		const code = CODE_WORDS[r[0] % CODE_WORDS.length] + "-" + Array.from(r.slice(1), (b) => CODE_CHARS[b % CODE_CHARS.length]).join("");
+		if (!(await kv.get(P + "gcode:" + cleanCode(code)))) return code;
+	}
+	throw new Error("couldn't make a unique code");
+}
+async function getGroup(kv, id) {
+	return /^[a-z0-9]{1,24}$/.test(String(id || "")) ? kv.get(P + "group:" + id, "json") : null;
+}
+async function putGroup(kv, g) {
+	await kv.put(P + "group:" + g.id, JSON.stringify(g), { metadata: { n: g.name, o: g.owner || "", k: g.members.length } });
+}
+async function groupByCode(kv, code) {
+	const c = cleanCode(code);
+	if (c.length < 6) return null;
+	const id = await kv.get(P + "gcode:" + c);
+	return id ? getGroup(kv, id) : null;
+}
+async function userGroups(kv, username) { return (await kv.get(P + "ug:" + username, "json")) || []; }
+async function setUserGroups(kv, username, ids) {
+	if (ids.length) await kv.put(P + "ug:" + username, JSON.stringify(ids));
+	else await kv.delete(P + "ug:" + username);
+}
+async function addToGroup(kv, g, username) {
+	if (!g.members.includes(username)) { g.members.push(username); await putGroup(kv, g); }
+	const ids = await userGroups(kv, username);
+	if (!ids.includes(g.id)) { ids.push(g.id); await setUserGroups(kv, username, ids); }
+}
+async function deleteGroup(kv, g) {
+	await Promise.all(g.members.map(async (u) => setUserGroups(kv, u, (await userGroups(kv, u)).filter((x) => x !== g.id))));
+	await Promise.all([kv.delete(P + "group:" + g.id), kv.delete(P + "gcode:" + cleanCode(g.code))]);
+}
+// Take someone out of a group. If they owned it, the longest-standing member
+// takes over; an empty group is deleted.
+async function removeFromGroup(kv, g, username) {
+	g.members = g.members.filter((u) => u !== username);
+	await setUserGroups(kv, username, (await userGroups(kv, username)).filter((x) => x !== g.id));
+	if (!g.members.length) { await kv.delete(P + "group:" + g.id); await kv.delete(P + "gcode:" + cleanCode(g.code)); return; }
+	if (g.owner === username) g.owner = g.members[0];
+	await putGroup(kv, g);
+}
+async function removeFromAllGroups(kv, username) {
+	for (const id of await userGroups(kv, username)) {
+		const g = await getGroup(kv, id);
+		if (g) await removeFromGroup(kv, g, username);
+	}
+	await kv.delete(P + "ug:" + username);
+}
+// Once: everyone who joined before groups existed goes into "Our class",
+// owned by the first site admin. The site invite code then joins that group.
+let groupsReady = false;
+async function ensureGroups(env) {
+	if (groupsReady) return;
+	const kv = kvOf(env);
+	if (await kv.get(P + "groupsinit")) { groupsReady = true; return; }
+	const users = (await listAll(kv, P + "user:")).map((k) => k.name.slice((P + "user:").length));
+	if (users.length) {
+		const admins = String(env.REO_ADMINS || "").split(",").map((x) => x.trim().toLowerCase());
+		const owner = admins.find((a) => users.includes(a)) || users[0];
+		const members = [owner].concat(users.filter((u) => u !== owner));
+		const g = { id: "class", name: "Our class", owner, code: await newGroupCode(kv), closed: false, created: new Date().toISOString(), members };
+		await putGroup(kv, g);
+		await kv.put(P + "gcode:" + cleanCode(g.code), g.id);
+		for (const u of members) {
+			const ids = await userGroups(kv, u);
+			if (!ids.includes(g.id)) await setUserGroups(kv, u, ids.concat(g.id));
+		}
+	}
+	await kv.put(P + "groupsinit", new Date().toISOString());
+	groupsReady = true;
+}
+function groupView(g, username, env) {
+	return { id: g.id, name: g.name, owner: g.owner === username, ownerName: g.owner, code: g.code, closed: !!g.closed, count: g.members.length,
+		members: g.owner === username || isAdmin(env, username) ? g.members : undefined };
+}
+
+async function listGroups(env, session) {
+	const kv = kvOf(env);
+	const out = [];
+	for (const id of await userGroups(kv, session.u)) {
+		const g = await getGroup(kv, id);
+		if (g && g.members.includes(session.u)) out.push(groupView(g, session.u, env));
+	}
+	return json({ groups: out, limits: { members: GROUP_MAX_MEMBERS, owned: MAX_OWNED_GROUPS, joined: MAX_JOINED_GROUPS } });
+}
+
+async function createGroup(request, env, session) {
+	const kv = kvOf(env);
+	const body = await readBody(request);
+	const name = cleanGroupName(body && body.name);
+	if (name.length < 2) return json({ error: "Give your rōpū a name (2–40 characters)." }, 400);
+	const ids = await userGroups(kv, session.u);
+	if (ids.length >= MAX_JOINED_GROUPS) return json({ error: "You're in " + MAX_JOINED_GROUPS + " rōpū already — leave one first." }, 400);
+	let owned = 0;
+	for (const id of ids) { const g = await getGroup(kv, id); if (g && g.owner === session.u) owned++; }
+	if (owned >= MAX_OWNED_GROUPS) return json({ error: "You can run up to " + MAX_OWNED_GROUPS + " rōpū." }, 400);
+	const g = { id: hex(crypto.getRandomValues(new Uint8Array(6))), name, owner: session.u, code: await newGroupCode(kv), closed: false,
+		created: new Date().toISOString(), members: [] };
+	await kv.put(P + "gcode:" + cleanCode(g.code), g.id);
+	await addToGroup(kv, g, session.u);
+	return json({ group: groupView(g, session.u, env) });
+}
+
+async function joinGroup(request, env, session) {
+	const kv = kvOf(env);
+	if (await tooManyFails(kv, request)) return json({ error: "Too many attempts. Try again in 15 minutes." }, 429);
+	const body = await readBody(request);
+	const g = await groupByCode(kv, body && body.code);
+	if (!g) { await recordFail(kv, request); return json({ error: "That rōpū code isn't right." }, 404); }
+	if (g.members.includes(session.u)) return json({ group: groupView(g, session.u, env), already: true });
+	if (g.closed) return json({ error: "“" + g.name + "” isn't taking new members right now." }, 403);
+	if (g.members.length >= GROUP_MAX_MEMBERS) return json({ error: "“" + g.name + "” is full." }, 403);
+	if ((await userGroups(kv, session.u)).length >= MAX_JOINED_GROUPS) return json({ error: "You're in " + MAX_JOINED_GROUPS + " rōpū already — leave one first." }, 400);
+	await addToGroup(kv, g, session.u);
+	return json({ group: groupView(g, session.u, env) });
+}
+
+// Owner (or site admin) actions on one group
+async function manageGroup(request, env, session, action) {
+	const kv = kvOf(env);
+	const body = (await readBody(request)) || {};
+	const g = await getGroup(kv, body.id);
+	if (!g || !g.members.includes(session.u) && !isAdmin(env, session.u)) return json({ error: "Rōpū not found." }, 404);
+	if (action === "leave") {
+		if (!g.members.includes(session.u)) return json({ error: "You're not in that rōpū." }, 400);
+		await removeFromGroup(kv, g, session.u);
+		return json({ ok: true });
+	}
+	if (g.owner !== session.u && !isAdmin(env, session.u)) return json({ error: "Only the rōpū owner can do that." }, 403);
+	if (action === "rename") {
+		const name = cleanGroupName(body.name);
+		if (name.length < 2) return json({ error: "Name must be 2–40 characters." }, 400);
+		g.name = name;
+	} else if (action === "newcode") {
+		await kv.delete(P + "gcode:" + cleanCode(g.code));
+		g.code = await newGroupCode(kv);
+		await kv.put(P + "gcode:" + cleanCode(g.code), g.id);
+	} else if (action === "close") {
+		g.closed = !!body.closed;
+	} else if (action === "remove") {
+		const who = String(body.username || "").toLowerCase();
+		if (who === g.owner) return json({ error: "The owner can't be removed — leave or delete the rōpū instead." }, 400);
+		if (!g.members.includes(who)) return json({ error: "They're not in this rōpū." }, 404);
+		await removeFromGroup(kv, g, who);
+		return json({ group: groupView(g, session.u, env) });
+	} else if (action === "delete") {
+		if (body.confirm !== g.name) return json({ error: "Type the rōpū name to confirm." }, 400);
+		await deleteGroup(kv, g);
+		return json({ ok: true });
+	} else return json({ error: "Unknown action." }, 400);
+	await putGroup(kv, g);
+	return json({ group: groupView(g, session.u, env) });
+}
+
+// Site admins: every rōpū, so abusive ones can be removed
+async function adminGroups(env, session) {
+	if (!isAdmin(env, session.u)) return json({ error: "Admins only." }, 403);
+	const keys = await listAll(kvOf(env), P + "group:");
+	return json({ groups: keys.map((k) => ({ id: k.name.slice((P + "group:").length), name: (k.metadata || {}).n || "", owner: (k.metadata || {}).o || "", count: (k.metadata || {}).k || 0 })) });
+}
+
+// ---------------------------------------------------------------------------
 // API routes
 // ---------------------------------------------------------------------------
 
@@ -311,7 +489,7 @@ async function register(request, env) {
 	const kv = kvOf(env);
 	const config = await getConfig(kv);
 	const code = inviteCode(env, config);
-	if (!code || config.closed) return json({ error: "Sign-ups are closed right now. Ask the group organiser." }, 403);
+	if (config.closed) return json({ error: "Sign-ups are closed right now. Ask the group organiser." }, 403);
 	if (await tooManyFails(kv, request)) return json({ error: "Too many attempts. Try again in 15 minutes." }, 429);
 	const body = await readBody(request);
 	if (!body) return json({ error: "Invalid request." }, 400);
@@ -320,9 +498,15 @@ async function register(request, env) {
 	const username = String(body.username || "").trim().toLowerCase();
 	const name = cleanName(body.name) || username;
 	const password = String(body.password || "");
-	if (!safeEqual(String(body.invite || "").trim(), code)) {
-		await recordFail(kv, request);
-		return json({ error: "That invite code isn't right." }, 403);
+	// Either the site invite code (joins "Our class") or any rōpū's join code
+	const given = String(body.invite || "").trim();
+	let group = null;
+	if (code && safeEqual(given, code)) group = await getGroup(kv, "class");
+	else {
+		group = await groupByCode(kv, given);
+		if (!group) { await recordFail(kv, request); return json({ error: "That invite code isn't right." }, 403); }
+		if (group.closed) return json({ error: "“" + group.name + "” isn't taking new members right now." }, 403);
+		if (group.members.length >= GROUP_MAX_MEMBERS) return json({ error: "“" + group.name + "” is full." }, 403);
 	}
 	if (!USERNAME_RE.test(username)) return json({ error: "Username: 3–20 lowercase letters, numbers, - or _." }, 400);
 	if (password.length < 8) return json({ error: "Password must be at least 8 characters." }, 400);
@@ -334,8 +518,9 @@ async function register(request, env) {
 	const h = await hashPassword(password);
 	const user = { username, name, ...h, created: new Date().toISOString() };
 	await putUser(kv, user);
+	if (group && group.members.length < GROUP_MAX_MEMBERS) await addToGroup(kv, group, username);
 	const token = await createSession(kv, user);
-	return json({ username, name, admin: isAdmin(env, username) }, 200, { "Set-Cookie": sessionCookie(token, SESSION_TTL) });
+	return json({ username, name, admin: isAdmin(env, username), group: group ? group.id : null }, 200, { "Set-Cookie": sessionCookie(token, SESSION_TTL) });
 }
 
 async function login(request, env) {
@@ -395,9 +580,17 @@ async function putProgress(request, env, session) {
 	return json({ ok: true, savedAt });
 }
 
-async function leaderboard(env) {
-	const keys = await listAll(kvOf(env), P + "progress:");
-	return json({ members: keys.map((k) => k.metadata).filter((m) => m && !m.h) });
+async function leaderboard(env, session, url) {
+	const kv = kvOf(env);
+	const id = url.searchParams.get("group") || "all";
+	let only = null;
+	if (id !== "all") {
+		const g = await getGroup(kv, id);
+		if (!g || !g.members.includes(session.u)) return json({ error: "Rōpū not found." }, 404);
+		only = new Set(g.members);
+	}
+	const keys = await listAll(kv, P + "progress:");
+	return json({ members: keys.map((k) => k.metadata).filter((m) => m && !m.h && (!only || only.has(m.u))) });
 }
 
 async function changePassword(request, env, session) {
@@ -448,6 +641,7 @@ async function deleteAccount(request, env, session) {
 	if (isAdmin(env, session.u)) {
 		return json({ error: "Group admins can't delete their account here — remove your username from REO_ADMINS in Cloudflare first." }, 400);
 	}
+	await removeFromAllGroups(kv, session.u);
 	const fb = (await listAll(kv, P + "fb:")).filter((k) => k.metadata && k.metadata.u === session.u);
 	await Promise.all([
 		kv.delete(P + "user:" + session.u),
@@ -522,6 +716,7 @@ async function adminRemove(request, env, session) {
 	if (username === session.u || isAdmin(env, username)) return json({ error: "Admins can't be removed here." }, 400);
 	const kv = kvOf(env);
 	if (!(await kv.get(P + "user:" + username))) return json({ error: "No member with that username." }, 404);
+	await removeFromAllGroups(kv, username);
 	await Promise.all([kv.delete(P + "user:" + username), kv.delete(P + "progress:" + username)]);
 	return json({ ok: true });
 }
@@ -897,11 +1092,21 @@ async function adminFeedbackUpdate(request, env, session) {
 	return json({ ok: true });
 }
 
+async function publicGroup(request, env) {
+	const kv = kvOf(env);
+	if (await tooManyFails(kv, request)) return json({ error: "Too many attempts. Try again in 15 minutes." }, 429);
+	const g = await groupByCode(kv, new URL(request.url).searchParams.get("code"));
+	if (!g) { await recordFail(kv, request); return json({ error: "That invite link isn't valid any more." }, 404); }
+	return json({ name: g.name, open: !g.closed && g.members.length < GROUP_MAX_MEMBERS });
+}
+
 async function handleApi(request, env, path) {
+	await ensureGroups(env);
 	const m = request.method;
 	if (m === "POST" && path === "register") return register(request, env);
 	if (m === "POST" && path === "login") return login(request, env);
 	if (m === "GET" && path === "public/config") return json({ turnstile: env.TURNSTILE_SECRET && env.TURNSTILE_SITE_KEY ? env.TURNSTILE_SITE_KEY : null });
+	if (m === "GET" && path === "public/group") return publicGroup(request, env);
 
 	const session = await getSession(request, env);
 	if (!session) return json({ error: "Not signed in." }, 401);
@@ -910,7 +1115,14 @@ async function handleApi(request, env, path) {
 	if (m === "POST" && path === "logout") return logout(request, env, session);
 	if (m === "GET" && path === "progress") return getProgress(env, session);
 	if (m === "PUT" && path === "progress") return putProgress(request, env, session);
-	if (m === "GET" && path === "leaderboard") return leaderboard(env);
+	if (m === "GET" && path === "leaderboard") return leaderboard(env, session, new URL(request.url));
+	if (m === "GET" && path === "groups") return listGroups(env, session);
+	if (m === "POST" && path === "groups/create") return createGroup(request, env, session);
+	if (m === "POST" && path === "groups/join") return joinGroup(request, env, session);
+	if (m === "POST" && path.startsWith("groups/") && ["leave", "rename", "newcode", "close", "remove", "delete"].includes(path.slice(7))) {
+		return manageGroup(request, env, session, path.slice(7));
+	}
+	if (m === "GET" && path === "admin/groups") return adminGroups(env, session);
 	if (m === "POST" && path === "password") return changePassword(request, env, session);
 	if (m === "POST" && path === "account/signout-others") return signOutEverywhereElse(env, session);
 	if (m === "POST" && path === "account/delete") return deleteAccount(request, env, session);
@@ -956,6 +1168,11 @@ export async function handlePanana(request, env, url) {
 		return new Response(null, { status: 301, headers: { Location: "/panana" + path.slice(4) + url.search } });
 	}
 
+	if (path.startsWith("/panana/join/")) {
+		const code = cleanCode(decodeURIComponent(path.slice("/panana/join/".length))).slice(0, 20);
+		const signedIn = kvOf(env) ? await getSession(request, env) : null;
+		return new Response(null, { status: 302, headers: { Location: (signedIn ? "/panana/?join=" : "/panana/login?join=") + code, "Cache-Control": "no-store" } });
+	}
 	if (path === "/panana" || path.startsWith("/panana/")) {
 		if (PUBLIC_PAGES.has(path) || path.startsWith("/panana/icons/")) return secured(await env.ASSETS.fetch(request));
 		if (kvOf(env)) await ensureStore(env);

@@ -503,3 +503,12 @@ summary { cursor: pointer; color: var(--brand-text); font-weight: 600; padding: 
 .clock-guide .cg-top { grid-area: top; } .clock-guide .cg-bottom { grid-area: bottom; }
 .clock-guide .cg-left { grid-area: left; text-align: right; justify-self: end; } .clock-guide .cg-right { grid-area: right; text-align: left; justify-self: start; }
 .clock-guide p { grid-area: note; margin: 6px 0 0; font-weight: 400; text-align: center; }
+
+/* Rōpū (groups) */
+.board-pick { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 4px; scrollbar-width: none; }
+.board-pick::-webkit-scrollbar { display: none; }
+.board-pick .chip { flex-shrink: 0; max-width: 70vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.invite-box { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; background: var(--brand-soft); border-radius: 12px; padding: 10px 12px; margin: 8px 0; }
+.invite-box code.invite { font-size: 1.15rem; letter-spacing: .06em; }
+.group-card .btn { margin-top: 8px; }
+.invite-banner { margin: 12px 0; }
