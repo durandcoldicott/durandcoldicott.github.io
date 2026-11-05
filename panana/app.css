@@ -349,6 +349,9 @@ body.in-session { background: var(--surface); }
 
 /* ---------- account ---------- */
 .toggle-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 12px 0; }
+/* the switch keeps its full width; the description wraps instead */
+.toggle-row > .chip, .toggle-row > .btn, .toggle-row > .choices { flex-shrink: 0; white-space: nowrap; }
+.toggle-row > span:first-child { min-width: 0; }
 details { margin: 8px 0 12px; }
 summary { cursor: pointer; color: var(--brand-text); font-weight: 600; padding: 6px 0; }
 .mini-form { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
