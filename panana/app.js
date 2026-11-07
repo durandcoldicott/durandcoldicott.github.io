@@ -708,10 +708,28 @@
 	var SWATCHES = { "tae-whero": "🟥", "tae-karaka": "🟧", "tae-kōwhai": "🟨", "tae-kākāriki": "🟩", "tae-kikorangi": "🟦",
 		"tta-waiporoporo": "🟪", "tae-parauri": "🟫", "tae-pango": "⬛", "tae-mā": "⬜" };
 	var SWATCH_IDS = Object.keys(SWATCHES);
+	// Tēnei / tēnā / tērā are about whose reach a thing is in, not distance in
+	// metres: near me (the speaker), near you (the listener), or away from both.
 	var DEMS = [
-		{ w: "tēnei", pl: "ēnei", cue: "👇 here, by me", en: "this", enPl: "these", where: "by me" },
-		{ w: "tēnā", pl: "ēnā", cue: "👉 there, by you", en: "that", enPl: "those", where: "by you" },
-		{ w: "tērā", pl: "ērā", cue: "🔭 over there", en: "that", enPl: "those", where: "over there" }];
+		{ pos: "me", w: "tēnei", pl: "ēnei", cue: "near me — I'm the one speaking", en: "this", enPl: "these", where: "near me" },
+		{ pos: "you", w: "tēnā", pl: "ēnā", cue: "near you — the person I'm talking to", en: "that", enPl: "those", where: "near you" },
+		{ pos: "far", w: "tērā", pl: "ērā", cue: "over there — away from both of us", en: "that", enPl: "those", where: "over there" }];
+	// A little scene: me and you, each with a circle for what's in reach, and
+	// the thing placed in my reach, your reach, or far from both.
+	function demScene(pos, pic, many, labels) {
+		var item = function (p) {
+			if (labels) return '<span class="ds-item">' + pic + '<b class="ds-word">' + labels[p] + "</b></span>";
+			return p === pos ? '<span class="ds-item">' + (many ? pic + pic : pic) + "</span>" : "";
+		};
+		return '<div class="dem-scene' + (labels ? " guide" : "") + '" role="img" aria-label="' + (labels ? "tēnei near me, tēnā near you, tērā far from both" : "The thing is " + (pos === "me" ? "near me, the speaker" : pos === "you" ? "near you, the listener" : "far from both of us")) + '">' +
+			'<div class="ds-zone ds-me' + (!labels && pos === "me" ? " on" : "") + '"><span class="ds-person">🗣️</span><span class="ds-who">me</span>' + item("me") + "</div>" +
+			'<div class="ds-zone ds-you' + (!labels && pos === "you" ? " on" : "") + '"><span class="ds-person">🧑</span><span class="ds-who">you</span>' + item("you") + "</div>" +
+			'<div class="ds-far' + (!labels && pos === "far" ? " on" : "") + '">' + item("far") + '<span class="ds-who">over there</span></div></div>';
+	}
+	function demGuide() {
+		return '<div class="dem-guide">' + demScene(null, "🍎", false, { me: "tēnei", you: "tēnā", far: "tērā" }) +
+			'<p class="muted small">It\'s about <b>whose reach</b> it\'s in, not exact distance. In my reach (I\'m speaking) → <b>tēnei</b>. In your reach (you\'re listening) → <b>tēnā</b>. In neither → <b>tērā</b>. More than one: drop the t — <b>ēnei, ēnā, ērā</b>.</p></div>';
+	}
 	function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
 	function words(sentence) { return sentence.replace(/[.?!]$/, "").split(" "); }
 
@@ -733,6 +751,7 @@
 			case "eHia": return { ok: nums >= 3 && knownThings(true).length >= 2, need: "Learn 3 numbers and a few objects first." };
 			case "feeling": return { ok: feelings().length >= 3, need: "Learn 3 Kare-ā-roto (feelings) words first." };
 			case "demonstrative": return { ok: knownThings(true).length >= 3, need: "Learn 3 words with pictures (e.g. fruit) first." };
+			case "demoWhich": return { ok: ["hua-tēnei", "hua-tēnā", "hua-tērā"].every(known) && knownThings(true).length >= 1, need: "Learn tēnei, tēnā and tērā first." };
 			case "list": return { ok: knownThings(true).length >= 6, need: "Learn 6 words with pictures (e.g. fruit) first." };
 			case "coloursOf":
 				return { ok: SWATCH_IDS.filter(known).length >= 3 && knownThings(true).length >= 2, need: "Learn 3 colours and 2 objects first." };
@@ -844,9 +863,17 @@
 			DEMS.forEach(function (d) { var x = plural ? d.pl : d.w; if (x !== w) wrongD.push("He " + td.mi + " " + x + "."); });
 			wrongD.push("He " + td.mi + " " + (plural ? dem.w : dem.pl) + ".");
 			shuffle(thingsD.filter(function (x) { return x.id !== td.id && x.en !== td.en; })).slice(0, 2).forEach(function (x) { wrongD.push("He " + x.mi + " " + w + "."); });
-			q = { visual: plural ? td.pic + td.pic + (Math.random() < 0.5 ? td.pic : "") : td.pic, many: plural, cue: dem.cue + (plural ? " · more than one" : ""),
+			q = { visual: demScene(dem.pos, td.pic, plural), cue: dem.cue + (plural ? " · more than one" : ""),
 				ask: "He aha " + w + "?", answer: ansD, wrong: wrongD,
 				en: "What " + (plural ? "are " + dem.enPl : "is " + dem.en) + " (" + dem.where + ")? " + cap(plural ? dem.enPl + " are: " : dem.en + " is: ") + firstGloss(td.en) + "." };
+		} else if (card.gen === "demoWhich") {
+			// Just the idea: which word fits where the thing is?
+			var tw = pick(knownThings(true)), dw = pick(DEMS), many2 = known("hua-ēnei") && Math.random() < 0.35;
+			var ansW = many2 ? dw.pl : dw.w;
+			var wrongW = DEMS.filter(function (d) { return d !== dw; }).map(function (d) { return many2 ? d.pl : d.w; });
+			wrongW.push(many2 ? dw.w : dw.pl);
+			q = { visual: demScene(dw.pos, tw.pic, many2), cue: dw.cue + (many2 ? " · more than one" : ""), ask: "Which word?", answer: ansW, wrong: wrongW, mcOnly: true,
+				en: ansW + " = " + (many2 ? dw.enPl : dw.en) + " (" + dw.cue + ")." };
 		} else if (card.gen === "list") {
 			var pool = shuffle(knownThings(true).filter(function (x, i, arr) { return arr.findIndex(function (y) { return y.en === x.en; }) === i; }));
 			var k = Math.min(pool.length - 3, Math.random() < 0.5 ? 3 : 4), items = pool.slice(0, k);
@@ -1763,6 +1790,7 @@
 		if (card.pic && !(session && session.current && session.current.ex === "intro")) html += '<div class="pic small-pic" aria-hidden="true">' + card.pic + "</div>";
 		if (card.note) html += '<p class="note">' + esc(card.note) + "</p>";
 		if (card.gen === "time" || card.gen === "timeRead") html += clockGuide();
+		if (card.gen === "demonstrative" || card.gen === "demoWhich" || /^hua-(tēnei|tēnā|tērā|ēnei|ēnā|ērā)$/.test(card.id)) html += demGuide();
 		if (card.ex) html += '<p class="ex"><b>' + esc(card.ex) + "</b><br><span class=\"muted\">" + esc(card.exEn) + "</span></p>";
 		if (!card.gen) html += '<a class="teaka" href="' + teAkaUrl(card) + '" target="_blank" rel="noopener">Look up “' + esc(card.lookup) + '” in Te Aka ↗</a>';
 		html += "</div>";
