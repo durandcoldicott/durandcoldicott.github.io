@@ -515,3 +515,19 @@ summary { cursor: pointer; color: var(--brand-text); font-weight: 600; padding: 
 .invite-box code.invite { font-size: 1.15rem; letter-spacing: .06em; }
 .group-card .btn { margin-top: 8px; }
 .invite-banner { margin: 12px 0; }
+
+/* tēnei / tēnā / tērā scene: me, you, and what's in each person's reach */
+.dem-scene { display: grid; grid-template-columns: 1fr 1fr 0.8fr; gap: 8px; align-items: end; font-size: 1rem; letter-spacing: 0; margin: 4px auto; max-width: 360px; }
+.ds-zone { position: relative; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 10px 4px 8px; min-height: 120px; justify-content: flex-end;
+	border: 2px dashed var(--line); border-radius: 50% 50% 18px 18px / 40% 40% 18px 18px; }
+.ds-zone.on { border-color: var(--brand); background: var(--brand-soft); }
+.ds-far { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 2px; min-height: 120px; padding-bottom: 8px; }
+.ds-far.on { color: var(--brand-text); }
+.ds-person { font-size: 2.6rem; line-height: 1; }
+.ds-who { font-size: .8rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.ds-item { font-size: 2.2rem; line-height: 1.1; display: flex; flex-direction: column; align-items: center; order: -1; }
+.ds-far .ds-item { font-size: 1.5rem; order: 0; }
+.ds-word { font-size: .95rem; color: var(--brand-text); margin-top: 2px; }
+.dem-scene.guide .ds-zone { border-color: var(--brand); }
+.dem-guide { margin: 12px 0 4px; padding: 12px; border-radius: 14px; background: var(--surface-2); }
+.dem-guide p { margin: 8px 0 0; text-align: center; }
