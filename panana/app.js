@@ -1149,7 +1149,8 @@
 		var topics = topicId ? [TOPIC_BY_ID[topicId]] : TOPICS.filter(function (t) { return t.group === "levels"; })
 			.sort(function (a, b) { return a.level - b.level; })
 			.concat(TOPICS.filter(function (t) { return t.group !== "levels"; }));
-		topics = topics.filter(function (t) { return !topicLocked(t); });
+		// Today's lesson follows the levels in order; choosing a topic yourself in Kaupapa doesn't.
+		if (!topicId) topics = topics.filter(function (t) { return !topicLocked(t); });
 		topics.forEach(function (t) {
 			t.cards.forEach(function (c) { if (!state.cards[c.id] && (!c.gen || genAvailable(c).ok) && list.indexOf(c) === -1) list.push(c); });
 		});
@@ -1377,7 +1378,7 @@
 			state.levelOpen = lvlNow;
 			session.levelUp = lvlNow;
 			if (!goalNow) setTimeout(function () { sfx("levelup"); }, 350);
-			toast("🔓 Taumata " + lvlNow + " is open!");
+			toast("🎉 Taumata " + lvlNow + " is now part of Today's lesson!");
 		}
 		save();
 	}
@@ -1617,15 +1618,15 @@
 		var html = '<main class="page"><h1>Kaupapa <span class="muted small">Topics</span></h1>';
 		if (levelled.length) {
 			html += '<h2 class="section-title first">Ngā Taumata <span class="muted small">Levels</span></h2>' +
-				'<p class="muted small">Words and sentences that build on each other. Each level opens when you\'ve practised ' + Math.round(LEVEL_UNLOCK * 100) + '% of the one before.</p>';
+				'<p class="muted small">Words and sentences that build on each other. Today\'s lesson moves on to the next level once you\'ve practised ' + Math.round(LEVEL_UNLOCK * 100) + '% of the one before — but you can open any topic and study it now.</p>';
 			for (var lvN = 1; lvN <= MAX_LEVEL; lvN++) {
 				var ts = levelTopics(lvN);
 				if (!ts.length) continue;
 				var open = levelUnlocked(lvN), pctL = Math.round(levelProgress(lvN) * 100);
-				html += '<div class="level-head' + (open ? "" : " locked") + '"><h3 class="term-title">' + (open ? "" : "🔒 ") + "Taumata " + lvN + "</h3>" +
+				html += '<div class="level-head"><h3 class="term-title">Taumata ' + lvN + "</h3>" +
 					'<div class="bar small-bar"><span style="width:' + pctL + '%"></span></div><span class="muted small">' + pctL + "%</span></div>" +
-					(open ? "" : '<p class="muted small">Opens when Taumata ' + (lvN - 1) + " is " + Math.round(LEVEL_UNLOCK * 100) + "% practised (now " + Math.round(levelProgress(lvN - 1) * 100) + "%).</p>") +
-					'<div class="path' + (open ? "" : " locked") + '">';
+					(open ? "" : '<p class="muted small">Joins Today\'s lesson when Taumata ' + (lvN - 1) + " is " + Math.round(LEVEL_UNLOCK * 100) + "% practised (now " + Math.round(levelProgress(lvN - 1) * 100) + "%). Tap a topic to start it early.</p>") +
+					'<div class="path">';
 				ts.forEach(function (t, i) { html += topicNode(t, i); });
 				html += "</div>";
 			}
@@ -1653,10 +1654,10 @@
 			'<h1>' + t.icon + " " + esc(t.mi) + ' <span class="muted small">' + esc(t.en) + "</span></h1>" +
 			(t.source ? '<p class="source small">Source: ' + esc(t.source) + "</p>" : "") +
 			(t.group === "levels" ? '<p class="source small">Taumata ' + t.level + "</p>" : "") +
-			(topicLocked(t) ? '<p class="banner warn small">🔒 This opens when Taumata ' + (t.level - 1) + " is " + Math.round(LEVEL_UNLOCK * 100) + "% practised.</p>" : "") +
+			(topicLocked(t) ? '<p class="banner small">⏭️ Ahead of Today\'s lesson — it joins your daily lessons once Taumata ' + (t.level - 1) + " is " + Math.round(LEVEL_UNLOCK * 100) + "% practised. You can study it now.</p>" : "") +
 			'<p class="muted">' + c.seen + "/" + c.total + " introduced · " + c.solid + " learned · " + c.mastered + " mastered</p>" +
 			'<div class="btn-row">' +
-			((due || fresh) && !topicLocked(t) ? '<button class="btn primary" data-action="start" data-mode="topic" data-topic="' + id + '">Study this topic</button>' : "") +
+			(due || fresh ? '<button class="btn primary" data-action="start" data-mode="topic" data-topic="' + id + '">Study this topic</button>' : "") +
 			(c.seen ? '<button class="btn" data-action="start" data-mode="practice" data-topic="' + id + '">Practise</button>' : "") +
 			"</div><ul class=\"word-list\">";
 		var hasPics = t.cards.some(function (c) { return c.pic; });
