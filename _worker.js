@@ -139,6 +139,13 @@ export default {
 	async fetch(request, env, ctx) {
 		const url = new URL(request.url);
 
+		// We Hungry runs in its own Worker (recipe-vault) and handles its own sign-in,
+		// headers and noindex. Hand the request over untouched.
+		if (url.pathname === "/wehungry" || url.pathname.startsWith("/wehungry/")) {
+			if (!env.WEHUNGRY) return new Response("We Hungry isn't connected here.", { status: 503, headers: { "Content-Type": "text/plain", "X-Robots-Tag": "noindex" } });
+			return env.WEHUNGRY.fetch(request);
+		}
+
 		const panana = await handlePanana(request, env, url);
 		if (panana) return panana;
 

@@ -8,7 +8,15 @@ binding = "ASSETS"
 # /panana (the te reo app) is behind a login, so its static files must go
 # through the Worker's session check instead of being served directly.
 # /reo is its old address, which the Worker redirects.
-run_worker_first = ["/panana", "/panana/*", "/reo", "/reo/*"]
+# /wehungry (the recipe app) is a separate Worker, reached through the service
+# binding below; nothing for it lives in this folder.
+run_worker_first = ["/panana", "/panana/*", "/reo", "/reo/*", "/wehungry", "/wehungry/*"]
+
+# We Hungry: its own Worker ("recipe-vault", in Desktop\recipe-app) with its
+# own database, photos and sign-in. This site just hands /wehungry requests to it.
+[[services]]
+binding = "WEHUNGRY"
+service = "recipe-vault"
 
 # Panana practice reminders (push notifications) are checked every 15 minutes.
 [triggers]
