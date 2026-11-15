@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<meta name="color-scheme" content="light dark" />
+	<script>
+		/* Apply a saved theme override before first paint (same "theme" key as the homepage). No saved value = follow the system. */
+		try {
+			var t = localStorage.getItem("theme");
+			if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+		} catch (e) { /* storage blocked: follow the system */ }
+	</script>
+	<title>Dashboards &amp; Automation: a Worked Example | Durand Coldicott</title>
+	<meta name="description" content="A worked example of the business dashboards, reports and automations I build for small businesses, shown on a fictional coffee roaster with simulated data. Freelance projects welcome." />
+	<link rel="canonical" href="https://durand.nz/demo/" />
+	<meta property="og:title" content="Dashboards & Automation: a Worked Example — Durand Coldicott" />
+	<meta property="og:description" content="Interactive business dashboards and automations for a fictional coffee roaster. Simulated data, real approach." />
+	<meta property="og:url" content="https://durand.nz/demo/" />
+	<meta property="og:image" content="https://durand.nz/images/gallery/fulls/DSC02197.jpg" />
+	<link rel="icon" href="/images/gallery/favicon.png" type="image/png" />
+	<link rel="preconnect" href="https://fonts.googleapis.com" />
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+	<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+	<link rel="stylesheet" href="/assets/css/fontawesome-all.min.css" />
+	<link rel="stylesheet" href="assets/demo.css" />
+</head>
+<body>
+
+	<a class="skip-link" href="#main">Skip to content</a>
+
+	<header class="topbar">
+		<a class="brand" href="/">Durand Coldicott</a>
+		<nav aria-label="On this page">
+			<ul>
+				<li><a href="#scenario">The company</a></li>
+				<li><a href="#dashboards">Dashboards</a></li>
+				<li><a href="#automations">Automations</a></li>
+				<li><a href="#work-with-me">Work with me</a></li>
+			</ul>
+		</nav>
+		<button type="button" class="theme-toggle" id="theme-toggle">
+			<i class="fas fa-moon to-dark" aria-hidden="true"></i>
+			<i class="fas fa-sun to-light" aria-hidden="true"></i>
+			<span class="visually-hidden to-dark">Switch to dark theme</span>
+			<span class="visually-hidden to-light">Switch to light theme</span>
+		</button>
+	</header>
+
+	<main id="main">
+
+		<section class="hero">
+			<div class="wrap">
+				<p class="eyebrow">A worked example &middot; fictional company &middot; simulated data</p>
+				<h1>Your data, doing more of the work.</h1>
+				<p class="lead">I build dashboards, reports and small automations that turn the exports you already have (store, email, accounting, spreadsheets) into something you can run the week from. Below is a worked example for a made-up business, so you can see the kind of thing I mean and poke at it.</p>
+				<div class="hero-actions">
+					<a class="btn" href="#dashboards">Explore the dashboards</a>
+					<a class="btn btn-ghost" href="/#contact">Talk about your data</a>
+				</div>
+				<div class="notice" role="note">
+					<i class="fas fa-info-circle" aria-hidden="true"></i>
+					<p><strong>Fernbird Coffee Co. isn't a real business.</strong> Every number, product, café and customer on this page is invented and generated in your browser. Nothing here comes from any current or past employer or client.</p>
+				</div>
+			</div>
+		</section>
+
+		<section id="scenario">
+			<div class="wrap">
+				<p class="eyebrow">The scenario</p>
+				<h2>Meet Fernbird Coffee Co.</h2>
+				<p class="lead">A small specialty roaster. They sell online (one-off orders and subscriptions), supply local cafés, and run a stall at the weekend market. Business is growing, and the way they keep track of it hasn't kept up.</p>
+
+				<div class="pain-grid">
+					<div class="pain">
+						<span class="pain-icon"><i class="fas fa-layer-group" aria-hidden="true"></i></span>
+						<h3>Numbers live in five places</h3>
+						<p>Online sales in the store, subscriptions in another tool, café orders in a shared spreadsheet. Every Monday someone stitches them together by hand.</p>
+					</div>
+					<div class="pain">
+						<span class="pain-icon"><i class="fas fa-box-open" aria-hidden="true"></i></span>
+						<h3>Stock runs low unnoticed</h3>
+						<p>The first sign a bag is running out is usually that it sells out, and a roast takes a couple of weeks to replace.</p>
+					</div>
+					<div class="pain">
+						<span class="pain-icon"><i class="fas fa-hand-holding-usd" aria-hidden="true"></i></span>
+						<h3>Cash and customers go quiet</h3>
+						<p>Overdue invoices and cafés that have stopped reordering only surface when someone happens to remember.</p>
+					</div>
+				</div>
+
+				<figure class="pipeline">
+					<div class="pipe-col">
+						<p class="pipe-title">What they already have</p>
+						<ul class="pipe-sources" id="pipe-sources"></ul>
+					</div>
+					<div class="pipe-arrow" aria-hidden="true"><i class="fas fa-arrow-right"></i></div>
+					<div class="pipe-col pipe-core">
+						<p class="pipe-title">What I'd build</p>
+						<p class="pipe-core-box"><i class="fas fa-database" aria-hidden="true"></i> One clean, joined-up set of numbers</p>
+					</div>
+					<div class="pipe-arrow" aria-hidden="true"><i class="fas fa-arrow-right"></i></div>
+					<div class="pipe-col">
+						<p class="pipe-title">What they get</p>
+						<ul class="pipe-outputs">
+							<li><i class="fas fa-chart-line" aria-hidden="true"></i> A dashboard to run the week from</li>
+							<li><i class="fas fa-envelope-open-text" aria-hidden="true"></i> A briefing in their inbox every Monday</li>
+							<li><i class="fas fa-bell" aria-hidden="true"></i> Alerts for the things that need action</li>
+						</ul>
+					</div>
+					<figcaption class="visually-hidden">Diagram: five existing data sources are combined into one clean set of numbers, which feeds a dashboard, a weekly briefing and alerts.</figcaption>
+				</figure>
+			</div>
+		</section>
+
+		<section id="dashboards">
+			<div class="wrap wrap-wide">
+				<p class="eyebrow">The dashboards</p>
+				<h2>Five views, one set of numbers.</h2>
+				<p class="lead">Each tab answers a question the owner would otherwise answer by opening spreadsheets. Change the range, sort the tables, hover the charts. It all runs on the same simulated data.</p>
+
+				<div class="tabs">
+					<div class="tablist" role="tablist" focusgroup="tablist nomemory" aria-label="Dashboard views">
+						<button type="button" role="tab" id="tab-overview" aria-selected="true" focusgroupstart><i class="fas fa-tachometer-alt" aria-hidden="true"></i> Overview</button>
+						<button type="button" role="tab" id="tab-products" aria-selected="false"><i class="fas fa-mug-hot" aria-hidden="true"></i> Products &amp; stock</button>
+						<button type="button" role="tab" id="tab-customers" aria-selected="false"><i class="fas fa-users" aria-hidden="true"></i> Customers</button>
+						<button type="button" role="tab" id="tab-wholesale" aria-selected="false"><i class="fas fa-store" aria-hidden="true"></i> Wholesale &amp; cash</button>
+						<button type="button" role="tab" id="tab-email" aria-selected="false"><i class="fas fa-envelope" aria-hidden="true"></i> Email</button>
+					</div>
+
+					<!-- OVERVIEW -->
+					<div role="tabpanel" aria-labelledby="tab-overview">
+						<div class="panel-inner">
+							<p class="panel-intro"><strong>The question:</strong> How is the business doing this week, and where is it coming from? <span class="built-from">Built from: online store + subscriptions + wholesale sheet + market takings.</span></p>
+							<div class="controls">
+								<div class="seg" role="group" aria-label="Date range" id="range-seg">
+									<button type="button" data-range="7" aria-pressed="false">7 days</button>
+									<button type="button" data-range="30" aria-pressed="true">30 days</button>
+									<button type="button" data-range="90" aria-pressed="false">90 days</button>
+								</div>
+								<div class="seg" role="group" aria-label="Compare against" id="compare-seg">
+									<button type="button" data-compare="prev" aria-pressed="true">Previous period</button>
+									<button type="button" data-compare="yoy" aria-pressed="false">Same dates last year</button>
+								</div>
+							</div>
+							<div class="kpi-row" id="kpis"></div>
+							<div class="card">
+								<div class="card-head">
+									<h3>Trend</h3>
+									<div class="seg" role="group" aria-label="Metric" id="metric-seg">
+										<button type="button" data-metric="revenue" aria-pressed="true">Revenue</button>
+										<button type="button" data-metric="orders" aria-pressed="false">Orders</button>
+										<button type="button" data-metric="margin" aria-pressed="false">Gross margin</button>
+									</div>
+								</div>
+								<div class="legend" id="trend-legend"></div>
+								<div class="chart" id="trend-chart" role="img" aria-label="Line chart of the selected metric, current period against the comparison period. The same numbers are in the table below."></div>
+								<details class="data-alt">
+									<summary>View the chart's data as a table</summary>
+									<div class="table-wrap" tabindex="0" role="region" aria-labelledby="trend-table-cap">
+										<table class="plain">
+											<caption id="trend-table-cap">Daily values behind the trend chart</caption>
+											<thead><tr><th scope="col">Date</th><th scope="col" id="trend-th-cur">This period</th><th scope="col" id="trend-th-cmp">Comparison</th></tr></thead>
+											<tbody id="trend-tbody"></tbody>
+										</table>
+									</div>
+								</details>
+							</div>
+							<div class="grid-2">
+								<div class="card">
+									<h3>Where the revenue comes from</h3>
+									<div id="channel-bars"></div>
+								</div>
+								<div class="card">
+									<h3>Weekly rhythm</h3>
+									<p class="card-note" id="weekday-note"></p>
+									<div id="weekday-bars"></div>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<!-- PRODUCTS -->
+					<div role="tabpanel" aria-labelledby="tab-products" hidden="until-found">
+						<div class="panel-inner">
+							<p class="panel-intro"><strong>The question:</strong> What's actually making money, and what do we need to roast next? <span class="built-from">Built from: store sales + unit costs + stock counts + supplier lead times.</span></p>
+							<div id="stock-callouts" class="callouts"></div>
+							<div class="card">
+								<div class="table-wrap" id="products-wrap" tabindex="0" role="region" aria-labelledby="products-cap">
+									<table class="data" id="products-table"><caption id="products-cap">Products, last 30 days.<span class="sort-hint"> Select a column heading to sort.</span></caption></table>
+								</div>
+							</div>
+							<div class="card">
+								<h3>Volume vs margin</h3>
+								<p class="card-note">Each dot is a product. Further right sells more; higher up keeps more of each dollar. A ringed dot needs restocking soon.</p>
+								<div class="chart" id="scatter-chart" role="img" aria-label="Scatter chart of units sold against gross margin for each product. The same numbers are in the products table above."></div>
+							</div>
+						</div>
+					</div>
+
+					<!-- CUSTOMERS -->
+					<div role="tabpanel" aria-labelledby="tab-customers" hidden="until-found">
+						<div class="panel-inner">
+							<p class="panel-intro"><strong>The question:</strong> Do customers come back, and are subscribers sticking around? <span class="built-from">Built from: customer order history + subscription records.</span></p>
+							<div class="kpi-row" id="cust-kpis"></div>
+							<div class="card">
+								<h3>Do new customers come back?</h3>
+								<p class="card-note">Each row is the group of customers who first ordered in that month. Each column shows what share of them ordered again that many months later.</p>
+								<div class="table-wrap" id="cohort-wrap" tabindex="0" role="region" aria-labelledby="cohort-cap">
+									<table class="cohort" id="cohort-table"><caption id="cohort-cap" class="visually-hidden">Customer retention by first-order month</caption></table>
+								</div>
+							</div>
+							<div class="card">
+								<h3>Subscriber movement</h3>
+								<p class="card-note">New subscribers above the line, cancellations below it, per month.</p>
+								<div id="subs-chart"></div>
+							</div>
+						</div>
+					</div>
+
+					<!-- WHOLESALE -->
+					<div role="tabpanel" aria-labelledby="tab-wholesale" hidden="until-found">
+						<div class="panel-inner">
+							<p class="panel-intro"><strong>The question:</strong> Who's gone quiet, and who owes us money? <span class="built-from">Built from: the wholesale orders sheet + accounting invoices.</span></p>
+							<div class="kpi-row" id="ws-kpis"></div>
+							<div class="card">
+								<h3>Money owed, by how late it is</h3>
+								<div id="ageing-bar"></div>
+							</div>
+							<div class="card">
+								<div class="table-wrap" id="accounts-wrap" tabindex="0" role="region" aria-labelledby="accounts-cap">
+									<table class="data" id="accounts-table"><caption id="accounts-cap">Café accounts. "Gone quiet" means they've gone far longer than their usual gap between orders. All café names are invented.<span class="sort-hint"> Select a column heading to sort.</span></caption></table>
+								</div>
+							</div>
+						</div>
+					</div>
+
+					<!-- EMAIL -->
+					<div role="tabpanel" aria-labelledby="tab-email" hidden="until-found">
+						<div class="panel-inner">
+							<p class="panel-intro"><strong>The question:</strong> Which emails earn their keep? <span class="built-from">Built from: email platform exports joined to store orders.</span></p>
+							<div class="card">
+								<h3>Automated flows vs one-off campaigns</h3>
+								<p class="card-note">Share of email-attributed revenue, last 30 days.</p>
+								<div id="email-split"></div>
+							</div>
+							<div class="card">
+								<div class="table-wrap" id="flows-wrap" tabindex="0" role="region" aria-labelledby="flows-cap">
+									<table class="data" id="flows-table"><caption id="flows-cap">Email performance, last 30 days.<span class="sort-hint"> Select a column heading to sort.</span></caption></table>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+				<p class="fine">All figures on this page are simulated. Percentage changes are computed live from the data shown, not typed in.</p>
+			</div>
+		</section>
+
+		<section id="automations">
+			<div class="wrap">
+				<p class="eyebrow">Automations</p>
+				<h2>Then take the repetitive part off someone's plate.</h2>
+				<p class="lead">A dashboard is something you have to remember to open. These run on their own and tell you when something needs attention. Here are four a business like Fernbird might use.</p>
+
+				<div class="auto-grid">
+					<article class="auto-card">
+						<h3><i class="fas fa-envelope-open-text" aria-hidden="true"></i> Monday briefing</h3>
+						<ol class="steps">
+							<li><span>Trigger</span> Every Monday, 7:00am</li>
+							<li><span>Reads</span> Sales, orders, stock, invoices</li>
+							<li><span>Sends</span> A one-page email to the owner</li>
+						</ol>
+						<p class="replaces">Replaces the Monday spreadsheet shuffle. <em>(Example: about 2 hours a week.)</em></p>
+					</article>
+					<article class="auto-card">
+						<h3><i class="fas fa-bell" aria-hidden="true"></i> Reorder alert</h3>
+						<ol class="steps">
+							<li><span>Trigger</span> Stock cover drops below lead time + a buffer</li>
+							<li><span>Reads</span> Stock levels and recent sales rate</li>
+							<li><span>Sends</span> A message with a suggested roast quantity</li>
+						</ol>
+						<p class="replaces">Catches stock-outs before customers do.</p>
+					</article>
+					<article class="auto-card">
+						<h3><i class="fas fa-file-invoice-dollar" aria-hidden="true"></i> Overdue nudge</h3>
+						<ol class="steps">
+							<li><span>Trigger</span> An invoice is 7+ days late</li>
+							<li><span>Reads</span> The customer, amount and order history</li>
+							<li><span>Drafts</span> A polite reminder for a person to approve</li>
+						</ol>
+						<p class="replaces">A human stays in the loop: it drafts, you send.</p>
+					</article>
+					<article class="auto-card">
+						<h3><i class="fas fa-broom" aria-hidden="true"></i> Export tidy-up</h3>
+						<ol class="steps">
+							<li><span>Trigger</span> A new CSV lands in a shared folder</li>
+							<li><span>Does</span> Standardises columns, removes duplicates, flags odd rows</li>
+							<li><span>Writes</span> One clean master sheet that dashboards read from</li>
+						</ol>
+						<p class="replaces">The unglamorous step that makes everything else trustworthy.</p>
+					</article>
+				</div>
+
+				<h3 class="briefing-heading">What the Monday briefing looks like</h3>
+				<p class="briefing-sub">This email is assembled live from the simulated data in the dashboards above. Nothing in it is hand-written.</p>
+				<div class="mail" id="briefing" aria-label="Example Monday briefing email"></div>
+			</div>
+		</section>
+
+		<section id="work-with-me">
+			<div class="wrap">
+				<p class="eyebrow">Work with me</p>
+				<h2>Simple jobs I take on.</h2>
+				<p class="lead">I'm taking on a limited number of freelance projects: small, well-scoped pieces of work for small businesses. If one of these sounds like your Monday, let's talk.</p>
+
+				<div class="job-grid">
+					<article class="job">
+						<span class="job-icon"><i class="fas fa-tachometer-alt" aria-hidden="true"></i></span>
+						<h3>Owner dashboard</h3>
+						<p>One page with the numbers you actually check, built from the exports you already have.</p>
+					</article>
+					<article class="job">
+						<span class="job-icon"><i class="fas fa-envelope-open-text" aria-hidden="true"></i></span>
+						<h3>Automated weekly report</h3>
+						<p>The report someone builds by hand each week, landing in your inbox on its own.</p>
+					</article>
+					<article class="job">
+						<span class="job-icon"><i class="fas fa-table" aria-hidden="true"></i></span>
+						<h3>Spreadsheet clean-up</h3>
+						<p>Several messy sheets and exports turned into one tidy, trustworthy source.</p>
+					</article>
+					<article class="job">
+						<span class="job-icon"><i class="fas fa-clipboard-check" aria-hidden="true"></i></span>
+						<h3>Store &amp; email audit</h3>
+						<p>A prioritised list of fixes for your online store and email flows, from someone who has run both for 10+ years.</p>
+					</article>
+					<article class="job">
+						<span class="job-icon"><i class="fas fa-boxes" aria-hidden="true"></i></span>
+						<h3>Stock &amp; reorder tracking</h3>
+						<p>Know what's running low and when to reorder, before it becomes a problem.</p>
+					</article>
+					<article class="job">
+						<span class="job-icon"><i class="fas fa-users" aria-hidden="true"></i></span>
+						<h3>Customer retention insight</h3>
+						<p>Who comes back, who doesn't, and what's worth doing about it.</p>
+					</article>
+				</div>
+
+				<ol class="process">
+					<li><strong>A short chat.</strong> Tell me what's painful and what data you have.</li>
+					<li><strong>A fixed quote.</strong> Scope, deliverable and price agreed before I start.</li>
+					<li><strong>Built and handed over.</strong> Documented so you're not dependent on me.</li>
+				</ol>
+
+				<div class="cta">
+					<div>
+						<h3>Got a spreadsheet problem?</h3>
+						<p>Send me a couple of lines about it. No pitch deck required.</p>
+					</div>
+					<div class="cta-actions">
+						<a class="btn" href="/#contact">Get in touch</a>
+						<a class="btn btn-ghost" href="mailto:durandcoldicott@gmail.com?subject=Freelance%20enquiry%20from%20durand.nz%2Fdemo">Email me</a>
+					</div>
+				</div>
+			</div>
+		</section>
+	</main>
+
+	<footer class="site-footer">
+		<div class="wrap">
+			<p>Fernbird Coffee Co. and everything about it (products, customers, cafés and every number) is fictional and simulated. Any resemblance to a real business is coincidental.</p>
+			<p><a href="/">&larr; Back to durand.nz</a> &middot; &copy; Durand Coldicott</p>
+		</div>
+	</footer>
+
+	<script type="module" src="assets/demo.js"></script>
+</body>
+</html>
