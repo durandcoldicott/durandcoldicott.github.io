@@ -1,16 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-	<script>
-		(function () {
-			var saved = localStorage.getItem("theme");
-			var theme = saved || (window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
-			document.documentElement.setAttribute("data-theme", theme);
-		})();
-	</script>
 	<meta charset="utf-8" />
 	<meta name="viewport" content="width=device-width, initial-scale=1" />
 	<meta name="color-scheme" content="dark light" />
+	<!-- Blocking on purpose: applies the saved theme before first paint -->
+	<script src="assets/js/theme-init.js"></script>
 	<title>Durand Coldicott | AI & eCommerce Consultant | Aotearoa</title>
 	<meta name="description" content="AI and eCommerce consultant with 10+ years running a bespoke platform end-to-end. I help small businesses without in-house expertise align AI strategy with business strategy — from ideation through to hands-on delivery." />
 	<meta name="keywords" content="AI consultant, ecommerce consultant, AI strategy, AI ideation, bespoke ecommerce platform, digital strategist, AI-assisted development, small business consulting" />
@@ -203,16 +198,23 @@
 				<form id="contact-form" action="https://formspree.io/f/xovdlkgo" method="POST">
 					<div class="field-row">
 						<div class="field">
-							<input type="text" name="name" id="name" placeholder="Name" required />
+							<label for="name" class="visually-hidden">Name</label>
+							<input type="text" name="name" id="name" placeholder="Name" autocomplete="name" required data-error="name-error" />
+							<span id="name-error" class="error-msg">Please enter your name.</span>
 						</div>
 						<div class="field">
-							<input type="email" name="email" id="email" placeholder="Email" required />
+							<label for="email" class="visually-hidden">Email</label>
+							<input type="email" name="email" id="email" placeholder="Email" autocomplete="email" required data-error="email-error" />
+							<span id="email-error" class="error-msg">Please enter a valid email address.</span>
 						</div>
 					</div>
 					<div class="field" style="margin-bottom: 14px;">
-						<textarea name="message" id="message" placeholder="Message" rows="6" required></textarea>
+						<label for="message" class="visually-hidden">Message</label>
+						<textarea name="message" id="message" placeholder="Message" rows="6" required data-error="message-error"></textarea>
+						<span id="message-error" class="error-msg">Please write a message.</span>
 					</div>
 					<input type="hidden" name="_subject" value="New message from durand.nz" />
+					<p id="contact-status" class="form-status" role="alert"></p>
 					<button type="submit" class="btn">Send Message</button>
 				</form>
 			</div>

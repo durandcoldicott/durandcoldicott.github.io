@@ -8,6 +8,7 @@
 			var current = document.documentElement.getAttribute("data-theme") === "light" ? "light" : "dark";
 			var next = current === "light" ? "dark" : "light";
 			document.documentElement.setAttribute("data-theme", next);
+			document.querySelector('meta[name="color-scheme"]').content = next;
 			try {
 				localStorage.setItem("theme", next);
 			} catch (err) {
@@ -58,10 +59,13 @@
 	var form = document.getElementById("contact-form");
 	var thankYou = document.getElementById("thank-you-message");
 	var formContainer = document.getElementById("form-container");
+	var contactStatus = document.getElementById("contact-status");
 
 	if (form) {
+		syncFieldErrors(form);
 		form.addEventListener("submit", function (e) {
 			e.preventDefault();
+			contactStatus.textContent = "";
 			var formData = new FormData(form);
 
 			fetch(form.action, {
@@ -74,12 +78,47 @@
 						formContainer.style.display = "none";
 						thankYou.style.display = "block";
 					} else {
-						alert("Oops! Something went wrong.");
+						contactStatus.textContent = "Sorry, that didn't send. Please try again in a moment.";
 					}
 				})
 				.catch(function () {
-					alert("There was a problem submitting your form.");
+					contactStatus.textContent = "Sorry, that didn't send. Check your connection and try again.";
 				});
+		});
+	}
+
+	// Keep aria-invalid and the error text in step with :user-invalid, so screen
+	// readers hear an error only after the visitor has touched the field.
+	function syncFieldErrors(scope) {
+		var flagged = new WeakSet();
+		function link(el, shown) {
+			var id = el.getAttribute("data-error");
+			if (!id) return;
+			var ids = (el.getAttribute("aria-describedby") || "").split(/\s+/).filter(function (x) { return x && x !== id; });
+			if (shown) ids.push(id);
+			if (ids.length) el.setAttribute("aria-describedby", ids.join(" "));
+			else el.removeAttribute("aria-describedby");
+		}
+		function sync(el) {
+			if (!el.matches || !el.matches("input, select, textarea") || !scope.contains(el)) return;
+			var invalid = false;
+			try { invalid = el.matches(":user-invalid"); } catch (err) { invalid = !el.validity.valid && flagged.has(el); }
+			if (invalid) {
+				el.setAttribute("aria-invalid", "true");
+				link(el, true);
+				flagged.add(el);
+			} else if (flagged.has(el) || el.getAttribute("aria-invalid") !== "true") {
+				el.setAttribute("aria-invalid", "false");
+				link(el, false);
+				flagged.delete(el);
+			}
+		}
+		scope.querySelectorAll("input, select, textarea").forEach(function (el) { sync(el); });
+		["blur", "change", "invalid"].forEach(function (type) {
+			scope.addEventListener(type, function (e) { sync(e.target); }, true);
+		});
+		scope.addEventListener("input", function (e) {
+			if (e.target.hasAttribute("aria-invalid")) sync(e.target);
 		});
 	}
 

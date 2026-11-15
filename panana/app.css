@@ -48,6 +48,7 @@
 }
 
 * { box-sizing: border-box; }
+:is(input, textarea, select):focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
 html { -webkit-text-size-adjust: 100%; }
 body {
 	margin: 0;
@@ -302,7 +303,7 @@ body.in-session { background: var(--surface); }
 	padding: 14px 16px; border-radius: 14px;
 	border: 2px solid var(--line); background: var(--bg); color: var(--text);
 }
-.type-form input:focus { outline: none; border-color: var(--brand); }
+.type-form input:focus { border-color: var(--brand); }
 .macrons { display: flex; gap: 8px; margin: 10px 0; }
 .macrons .chip { flex: 1; font-size: 1.2rem; }
 
@@ -359,7 +360,7 @@ summary { cursor: pointer; color: var(--brand-text); font-weight: 600; padding: 
 	font: inherit; padding: 12px 14px; border-radius: 12px;
 	border: 1px solid var(--line); background: var(--bg); color: var(--text); width: 100%;
 }
-.mini-form input:focus, .auth-form input:focus { outline: none; border-color: var(--brand); }
+.mini-form input:focus, .auth-form input:focus { border-color: var(--brand); }
 .invite { font-size: 1.1rem; font-weight: 700; background: var(--surface-2); padding: 2px 8px; border-radius: 6px; user-select: all; }
 
 /* ---------- login page ---------- */
@@ -426,7 +427,7 @@ summary { cursor: pointer; color: var(--brand-text); font-weight: 600; padding: 
 
 /* ---------- feedback ---------- */
 .mini-form textarea { font: inherit; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--text); width: 100%; resize: vertical; }
-.mini-form textarea:focus { outline: none; border-color: var(--brand); }
+.mini-form textarea:focus { border-color: var(--brand); }
 .link-btn { font: inherit; font-size: .85rem; background: none; border: 0; color: var(--muted); padding: 8px 0 0; cursor: pointer; text-decoration: underline; }
 .report-form { margin-top: 8px; }
 .report-form .btn-row { margin: 4px 0 0; }
@@ -486,7 +487,7 @@ summary { cursor: pointer; color: var(--brand-text); font-weight: 600; padding: 
 .ds-panel p { margin: 0; }
 .ds-panel label { display: flex; flex-direction: column; gap: 6px; }
 .ds-panel input { font: inherit; font-size: 1rem; padding: 12px; border-radius: 12px; border: 2px solid var(--line); background: var(--surface-2); color: inherit; }
-.ds-panel input:focus { outline: none; border-color: var(--bad); }
+.ds-panel input:focus { border-color: var(--bad); }
 .ds-word { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .05em; color: var(--bad); }
 .ds-error { color: var(--bad); min-height: 0; }
 .ds-error:empty { display: none; }
